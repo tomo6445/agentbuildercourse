@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M5 &middot; The Claude Agent SDK: from hand-rolled to harness — Building AI Agents</title>
+<meta name="description" content="Here&#x27;s the loop you should actually ship — and exactly which of your lines it replaces.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 1 &middot; M5</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M5</span><span class="pill core">core path</span><span class="pill">3.5 h</span><span class="pill">phase 1 &middot; Building blocks</span></div>
+  <h1>The Claude Agent SDK: from hand-rolled to harness</h1>
+  <p class="line">Here's the loop you should actually ship — and exactly which of your lines it replaces.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#four-ways-to-build-an-agent">Four ways to build an agent</a></li><li><a href="#what-the-harness-replaces">What the harness replaces</a></li><li><a href="#sessions-and-forking-as-a-debugging-superpower">Sessions, and forking as a debugging superpower</a></li><li><a href="#permissions-a-gate-not-a-sandbox">Permissions: a gate, not a sandbox</a></li><li><a href="#hooks">Hooks</a></li><li><a href="#structured-output-and-cost-tracking">Structured output and cost tracking</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Choose between four ways of building an agent, on harness and deployment rather than vibes</li><li>Map every SDK abstraction back to the line of your M1 loop it replaces</li><li>Use sessions — including forking — as a debugging instrument, not just persistence</li><li>Configure permissions and hooks, and say precisely where each stops being a control</li><li>Get schema-conformant structured output and real cost tracking out of the harness</li></ul></div>
+<h2 id="four-ways-to-build-an-agent">Four ways to build an agent</h2>
+<p>You have written the loop. Now decide what to ship. Two independent questions separate the options: <strong>who supplies the harness</strong> (the loop plus context management) and <strong>who supplies the deployment</strong> (the infrastructure it runs on). Conflating those two is why this choice confuses people.</p>
+<div class="table-wrap"><table><thead><tr><th></th><th>You write</th><th>Harness</th><th>Deployment</th><th>Tools</th></tr></thead><tbody><tr><td><strong>Manual loop</strong></td><td>The whole loop</td><td>You</td><td>You</td><td>Only yours</td></tr><tr><td><strong>Tool Runner</strong></td><td>Just the tool functions</td><td>SDK</td><td>You</td><td>Only yours</td></tr><tr><td><strong>Managed Agents</strong></td><td>Agent config + your tool results</td><td>Anthropic</td><td>Anthropic</td><td>Hosted sandbox + Skills/MCP + yours</td></tr><tr><td><strong>Claude Agent SDK</strong></td><td>A prompt + options</td><td>SDK (Claude Code)</td><td>You</td><td>Read/Write/Edit/Bash/Glob/Grep/Web + MCP + subagents</td></tr></tbody></table></div>
+<p><strong>The manual loop</strong> is what you built in M1. Keep it when you need control the runner does not expose, or when you cannot take a beta dependency.</p>
+<p><strong>The Tool Runner</strong> is part of the regular Anthropic SDK — <code>client.beta.messages.tool_runner</code> with <code>@beta_tool</code>-decorated functions. It drives the loop over tools <em>you</em> define. No built-in tools, no sandbox; you still host everything.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">from anthropic import Anthropic, beta_tool
+
+client = Anthropic()
+
+@beta_tool
+def get_weather(city: str) -&gt; str:
+    &quot;&quot;&quot;Get current conditions for a city.
+
+    Args:
+        city: City name, e.g. &#x27;Oslo&#x27;.
+    &quot;&quot;&quot;
+    return &quot;4C, light rain&quot;
+
+runner = client.beta.messages.tool_runner(
+    model=&quot;claude-opus-5&quot;,
+    max_tokens=16000,
+    tools=[get_weather],
+    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Weather in Oslo?&quot;}],
+)
+for message in runner:
+    ...   # each iteration is one assistant turn; the loop ends when Claude stops calling tools</code></pre></figure>
+<p>That replaces your entire M1 <code>run()</code> function. The schema is generated from the signature and docstring — which means the docstring is now the tool description, and everything in M2 applies to it.</p>
+<p><strong>Managed Agents</strong> is the only option that supplies both the harness and the deployment: Anthropic runs the loop and hosts a per-session container where bash, file operations and code execution happen. Agents are persisted, versioned objects; sessions reference them. Reach for it when you want long-running, resumable, scheduled agents without operating any of it.</p>
+<p><strong>The Claude Agent SDK</strong> is a different product — Claude Code packaged as a library (<code>claude-agent-sdk</code>). It ships the full harness plus built-in file, shell, search and web tools, hooks, permissions, subagents and sessions. You call it with a prompt and options and it drives everything, on infrastructure you provide.</p>
+<aside class="callout c-warn"><h4>Tool Runner is not the Agent SDK</h4><div class="callout-body"><p>They sound alike and are unrelated packages. Tool Runner is a thin helper over <code>POST /v1/messages</code> for your own tools. The Agent SDK is the Claude Code harness with built-in tools. Both leave deployment to you; only Managed Agents adds hosted deployment. Getting this wrong sends people looking for filesystem tools in the wrong library.</p></div></aside>
+<h2 id="what-the-harness-replaces">What the harness replaces</h2>
+<p>The honest way to adopt a framework is to know which of your lines it is deleting.</p>
+<div class="table-wrap"><table><thead><tr><th>Your M1 code</th><th>The harness gives you</th></tr></thead><tbody><tr><td><code>while</code> loop over <code>stop_reason</code></td><td>The agent loop, including <code>pause_turn</code> handling</td></tr><tr><td><code>execute()</code> dispatcher</td><td>Tool registration and dispatch, with schema generation</td></tr><tr><td><code>is_error</code> result construction</td><td>Errors returned to the model automatically</td></tr><tr><td><code>messages.append(...)</code> bookkeeping</td><td>Session state, persisted and resumable</td></tr><tr><td>Your <code>Budget</code> class</td><td>Cost tracking, and hooks to enforce a ceiling</td></tr><tr><td>Your <code>Trace</code> dataclass</td><td>Structured events and OpenTelemetry spans (M10)</td></tr><tr><td>Ad-hoc "should I allow this" checks</td><td>A declarative permission layer</td></tr><tr><td>Nothing</td><td>Built-in file/shell/search tools, subagents, skills, plugins</td></tr></tbody></table></div>
+<p>Everything in the left column still exists. You are now debugging someone else's version of it, which is exactly why you wrote yours first.</p>
+<h2 id="sessions-and-forking-as-a-debugging-superpower">Sessions, and forking as a debugging superpower</h2>
+<p>Sessions persist a conversation so it can be resumed after the process dies — which turns "the agent crashed on turn 30" from a lost hour into a resume.</p>
+<p>The underused capability is <strong>forking</strong>. Take an existing session, branch it at turn 14, change one variable, and run both branches. Same history, same state, one difference.</p>
+<p>This is a controlled experiment, and it is the only reliable way to answer questions like:</p>
+<ul><li>Does the new tool description actually fix the misselection, or did the run just vary?</li><li>Is this failure caused by the compaction, or by the tool result that preceded it?</li><li>Would a cheaper model handle turns 15-30 as well?</li></ul>
+<p>Without forking you are re-running whole tasks and comparing stochastic outcomes, which needs many samples to say anything. With forking you change one thing. Fold this into your habits now; M10 builds replay-driven debugging on top of it.</p>
+<h2 id="permissions-a-gate-not-a-sandbox">Permissions: a gate, not a sandbox</h2>
+<p>A permission layer decides, per tool call, whether to allow, deny, or ask. Typical policy:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">allow:  read_file, grep, glob, web_search
+ask:    write_file, git_commit
+deny:   bash(rm *), bash(curl *), network writes</code></pre></figure>
+<p>This is genuinely useful and you should use it. Now understand precisely what it is not.</p>
+<p>A permission rule matching on command patterns is doing <strong>string analysis on an adversarial input</strong>. <code>curl</code> can be <code>/usr/bin/curl</code>, <code>$(which curl)</code>, a shell variable, a base64 blob piped to <code>sh</code>, or a Python one-liner that opens a socket. Every deny-list is a claim that you enumerated the ways to express an action, and you did not.</p>
+<p>Deny-lists are also the wrong shape. An allow-list of permitted operations fails closed; a deny-list of forbidden ones fails open, and it fails open in exactly the cases you did not think of.</p>
+<p>The real boundary is the one the process cannot talk its way past: a sandbox that cannot reach the network, a filesystem mount that does not contain the credentials, a proxy that only resolves allow-listed domains. That is M11, and this is the module that tells you why you need it.</p>
+<aside class="callout c-autopsy"><h4>Hooks as a security boundary</h4><div class="callout-body"><p>A team put PII redaction in a pre-tool hook and called the system compliant. The hook redacted arguments to the tools it knew about. Then someone added an MCP server, whose tools did not match the hook's patterns, and unredacted records started leaving the building through a path the compliance review had already approved. A hook that asks nicely is a policy, not a control. Policies belong in hooks; controls belong in the network and the filesystem.</p></div></aside>
+<h2 id="hooks">Hooks</h2>
+<p>Hooks run your code at lifecycle points — before a tool call, after it, at session start, on completion. Four things they are genuinely good for:</p>
+<p><strong>Validation.</strong> Reject a call before execution: a <code>write_file</code> outside the working directory, a <code>send_email</code> to an external domain when the policy is internal-only.</p>
+<p><strong>Redaction.</strong> Strip secrets and PII from tool results before they enter context — which also stops them entering your traces, your logs and your evals.</p>
+<p><strong>Audit.</strong> Append every tool call, argument and outcome to a durable log. Do this from day one. It costs nothing and is the difference between an incident you can explain and one you cannot.</p>
+<p><strong>Budget enforcement.</strong> Accumulate cost per session and abort when the ceiling is hit. Deciding <em>in advance</em> whether hitting a ceiling degrades, escalates or aborts is a design decision; discovering it at 3am is not.</p>
+<figure class="code" data-lang="python"><div class="code-title">hooks/budget.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">class CostCeiling:
+    &quot;&quot;&quot;Abort the run rather than discover the overage on the invoice.&quot;&quot;&quot;
+
+    def __init__(self, limit_usd):
+        self.limit_usd, self.spent = limit_usd, 0.0
+
+    def after_turn(self, usage, prices):
+        self.spent += (usage.input_tokens * prices.input
+                       + usage.output_tokens * prices.output) / 1e6
+        if self.spent &gt;= self.limit_usd:
+            raise BudgetExceeded(
+                f&quot;session cost ${self.spent:.2f} reached the ${self.limit_usd:.2f} ceiling&quot;
+            )</code></pre></figure>
+<h2 id="structured-output-and-cost-tracking">Structured output and cost tracking</h2>
+<p>When a downstream system consumes the agent's answer, you need a shape, not prose. Use <code>output_config.format</code> to constrain the response to a schema — and prefer <code>client.messages.parse()</code>, which validates for you.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">response = client.messages.parse(
+    model=&quot;claude-opus-5&quot;,
+    max_tokens=16000,
+    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: brief}],
+    output_config={&quot;format&quot;: {
+        &quot;type&quot;: &quot;json_schema&quot;,
+        &quot;schema&quot;: {
+            &quot;type&quot;: &quot;object&quot;,
+            &quot;properties&quot;: {
+                &quot;category&quot;: {&quot;type&quot;: &quot;string&quot;, &quot;enum&quot;: [&quot;billing&quot;, &quot;technical&quot;, &quot;account&quot;]},
+                &quot;confidence&quot;: {&quot;type&quot;: &quot;number&quot;},
+                &quot;citations&quot;: {&quot;type&quot;: &quot;array&quot;, &quot;items&quot;: {&quot;type&quot;: &quot;string&quot;}},
+            },
+            &quot;required&quot;: [&quot;category&quot;, &quot;confidence&quot;, &quot;citations&quot;],
+            &quot;additionalProperties&quot;: False,
+        },
+    }},
+)</code></pre></figure>
+<p>Two notes that will save you an afternoon. Assistant prefills — the old trick of seeding the response with <code>{</code> to force JSON — return a 400 on current models; structured outputs replace them. And <code>output_config.format</code> is incompatible with document citations, so if you need both, get citations into your schema as fields instead.</p>
+<p>For cost, read <code>usage</code> off every response and accumulate: <code>input_tokens</code>, <code>output_tokens</code>, <code>cache_creation_input_tokens</code>, <code>cache_read_input_tokens</code>. The cache fields are not optional detail — they are how you learn your cache broke (M3) and they are the dominant term in most agent cost models (M12).</p>
+<aside class="callout c-lab"><h4>Lab 5 — Port and harden</h4><div class="callout-body"><p><code>labs/lab05_sdk_port</code> moves your M3 research agent onto a harness. Required:</p>
+<ul><li>two custom tools, ported from your M1 registry</li><li>disk-persisted sessions that resume after the process is killed mid-task</li><li>a permission policy that denies network writes, with a test proving the denial</li><li>three hooks: pre-tool validation, PII redaction on results, and a cost-ceiling abort</li><li>schema-conformant structured output</li></ul>
+<p>The gate is deliberately harsh: <strong>your M3 eval suite must pass unchanged.</strong> A port that quietly changes behaviour is not a port. Then the new tests — resume-after-kill, cost-ceiling abort, permission denial — must also pass.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://code.claude.com/docs/en/agent-sdk">Claude Agent SDK</a> — the separate product, with its own docs</li><li><a href="https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview">Tool use: the tool runner</a></li><li><a href="https://docs.anthropic.com/en/docs/build-with-claude/structured-outputs">Structured outputs</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Ported agent passes M3's eval suite unchanged, plus new tests for resume-after-kill, cost-ceiling abort, and permission denial.</p>
+<p style="margin-top:9px"><code>pytest labs/lab05_sdk_port -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab05_sdk_port" style="margin-right:8px">lab05_sdk_port &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M5">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m04.html"><span class="dir">&#8592; previous</span><span class="t">M4 &middot; Workflows vs. Agents: choosing the right autonomy</span></a><a class="next" href="m06.html"><span class="dir">next &#8594;</span><span class="t">M6 &middot; MCP: the integration layer</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m05", "questions": [{"q": "Which option supplies both the agent harness <em>and</em> the deployment?", "options": ["The Tool Runner", "The Claude Agent SDK", "Managed Agents", "A manual loop with a process manager"], "answer": 2, "why": "The Tool Runner and the Claude Agent SDK are both harness-only \u2014 they run in your process, on infrastructure you provide. Managed Agents is the one where Anthropic runs the loop and hosts the per-session container the tools execute in."}, {"q": "You need filesystem and shell tools out of the box. Which do you reach for?", "options": ["The Tool Runner \u2014 pass bash and file tools to it", "The Claude Agent SDK, which ships Read/Write/Edit/Bash/Glob/Grep", "The manual loop \u2014 the others don't support tools", "Any of them; they all include built-in tools"], "answer": 1, "why": "The Tool Runner loops over tools you define and ships none of its own. The Claude Agent SDK is Claude Code as a library and includes the built-in file, shell and search tools. This is the distinction that most often sends people looking in the wrong package."}, {"q": "A permission rule denies <code>bash(curl *)</code>. Why is this a gate rather than a sandbox?", "options": ["Because permission rules are evaluated after the command runs", "Because it is string analysis on adversarial input \u2014 the same action has unbounded spellings", "Because bash tools cannot be gated at all", "Because the model can edit its own permission configuration"], "answer": 1, "why": "A deny-list claims you enumerated every way to express an action. <code>/usr/bin/curl</code>, <code>$(which curl)</code>, a Python socket one-liner and a base64 blob piped to sh all do the same thing and match no pattern. Deny-lists fail open in exactly the cases you did not imagine; the real boundary has to be one the process cannot talk past."}, {"q": "What makes session forking more useful than re-running a task when you are debugging?", "options": ["It is cheaper because earlier turns are cached", "It isolates one variable against identical history, turning a stochastic comparison into a controlled experiment", "It lets you skip the model call entirely", "It automatically identifies the failing turn"], "answer": 1, "why": "Re-running a whole task compares two stochastic outcomes, so you need many samples to conclude anything. Forking at turn 14 and changing one variable gives you the same history on both branches \u2014 a controlled experiment. (Caching may also make it cheaper, but that is not the reason it works.)"}, {"q": "Which pair of <code>usage</code> fields tells you your prompt cache has silently stopped working?", "options": ["input_tokens and output_tokens", "cache_creation_input_tokens and cache_read_input_tokens", "stop_reason and stop_details", "input_tokens and max_tokens"], "answer": 1, "why": "A cache read that should be large sitting at zero \u2014 while creation tokens are charged again every request \u2014 is the signature of a moving prefix: a timestamp in the system prompt, an unsorted tool list, a mid-session model switch. Nothing errors; you only see it if you watch these fields."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

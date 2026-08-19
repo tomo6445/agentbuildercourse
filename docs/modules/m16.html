@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M16 &middot; Capstone: ship one real thing and defend it — Building AI Agents</title>
+<meta name="description" content="Two students can build the same agent and receive very different grades. Judgement is weighted highest.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 4 &middot; M16</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M16</span><span class="pill core">core path</span><span class="pill">8.0 h</span><span class="pill">phase 4 &middot; Applied</span></div>
+  <h1>Capstone: ship one real thing and defend it</h1>
+  <p class="line">Two students can build the same agent and receive very different grades. Judgement is weighted highest.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#ship-one-real-thing">Ship one real thing</a></li><li><a href="#the-seven-stages-in-order">The seven stages, in order</a></li><li class="sub"><a href="#01-problem-definition-10">01 · Problem definition — 10%</a></li><li class="sub"><a href="#02-eval-first-design-20">02 · Eval-first design — 20%</a></li><li class="sub"><a href="#03-architecture-15">03 · Architecture — 15%</a></li><li class="sub"><a href="#04-build-20">04 · Build — 20%</a></li><li class="sub"><a href="#05-harden-15">05 · Harden — 15%</a></li><li class="sub"><a href="#06-instrument-10">06 · Instrument — 10%</a></li><li class="sub"><a href="#07-ship-and-defend-10">07 · Ship and defend — 10%</a></li><li><a href="#the-three-things-that-make-this-real">The three things that make this real</a></li><li><a href="#the-defence-panel">The defence panel</a></li><li><a href="#grading">Grading</a></li><li><a href="#where-to-go-next">Where to go next</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Take one real problem through seven stages, in order, without skipping the uncomfortable ones</li><li>Write and commit the eval suite before the agent exists</li><li>Set a cost ceiling at stage 1 and enforce it in CI</li><li>Demonstrate graceful failure under a fault you did not choose</li><li>Absorb a mid-project scope change the way real projects require</li><li>Defend the design to a panel, including two questions you know are coming</li></ul></div>
+<h2 id="ship-one-real-thing">Ship one real thing</h2>
+<p>Everything so far has been scaffolded. Failing tests told you what to build; eval sets came pre-written; the security lab handed you the attacks. The capstone removes the scaffolding.</p>
+<p>You will build one agent for one real problem, over two weeks, and defend it.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Two students can build the same agent and receive very different grades. Judgement is weighted highest.</p></div></aside>
+<p>That is not a warning about strictness. It is the actual grading criterion. An ambitious agent with a weak eval suite and an unexamined threat model scores below a modest agent whose author can say exactly what it does badly, why they chose this architecture, and what would change their mind. The Decision Log carries more weight than the demo.</p>
+<h2 id="the-seven-stages-in-order">The seven stages, in order</h2>
+<p>The order is enforced, and the enforcement is the point. Stage 2 before stage 4 is what separates this from every project that shipped a demo and discovered its failure modes in production.</p>
+<h3 id="01-problem-definition-10">01 · Problem definition — 10%</h3>
+<p>Who is the user, what is the task, what does success mean, and <strong>why an agent</strong>? Apply the M4 framework in writing: enumerable steps, findings-dependence, value per task, reversibility, evaluability. Estimate the value of one successful task in money or time.</p>
+<p>If the framework says "this should be a workflow", <strong>build the workflow.</strong> Choosing correctly against your own preference is worth more marks than building the more impressive thing.</p>
+<h3 id="02-eval-first-design-20">02 · Eval-first design — 20%</h3>
+<p><strong>Written and committed before a line of agent code exists.</strong> At least 30 cases across three tiers, outcome and trajectory assertions, a written judge rubric, and a validated judge — hand-label 30 outputs, measure kappa, iterate.</p>
+<p>The heaviest-weighted stage, deliberately. This is where projects live or die, and doing it first is the only way to find out that you cannot define success — which is much better to discover in week one than in week two.</p>
+<h3 id="03-architecture-15">03 · Architecture — 15%</h3>
+<p>A diagram, plus Decision Log entries for: autonomy level (per action class, M13), tool design (M2), context strategy (M3), memory (M7), single versus multi-agent with the cost arithmetic (M9), and deployment shape (M15).</p>
+<p>Each entry states the decision, the alternatives, the reason, and what evidence would reverse it. That last field is what makes it a decision log rather than a justification.</p>
+<figure class="code" data-lang="markdown"><div class="code-title">decisions/003-single-vs-multi-agent.md</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-markdown"># 003 · Single agent, not orchestrator-workers
+
+**Decision.** One agent with JIT retrieval (M3), not an orchestrator with a worker pool.
+
+**Alternatives considered.**
+  - Orchestrator + 3 workers, one per document class.
+  - Orchestrator + N workers scaled by document count.
+
+**Reason.** Measured on 15 representative tasks: 3 workers scored 0.78 against the
+single agent&#x27;s 0.74 — four points, for 3.2x the cost. At an estimated value of
+$1.10 per task and a ceiling of $0.18, the multi-agent version does not fit the
+budget set at stage 1. The work is also only weakly parallel: document classes
+share a lookup table, so workers duplicate roughly a third of their reads.
+
+**What would reverse this.** Value per task rising above ~$4, or the corpus growing
+past ~40 documents per task, where the single agent&#x27;s context strategy starts to
+degrade (currently holds to turn 60 with 8-14 documents).</code></pre></figure>
+<h3 id="04-build-20">04 · Build — 20%</h3>
+<p>A working agent on a real harness, with MCP integration where the domain warrants it. Every gate you have passed applies: tools that survive the M2 rubric, a context strategy that holds at depth, errors the agent can recover from, traces you can read.</p>
+<h3 id="05-harden-15">05 · Harden — 15%</h3>
+<p>Threat model, with the lethal trifecta audit written out. Sandboxing, egress posture, credential posture. Red-team your own agent and report what you found — including what you could not fix, and what residual risk you are accepting.</p>
+<p>An honest "here is the attack I could not defend against, and here is why I accept it" scores better than a claim of completeness the panel can break in one question.</p>
+<h3 id="06-instrument-10">06 · Instrument — 10%</h3>
+<p>Traces, cost dashboard, alerting on agent-shaped signals (M10), and a documented failure taxonomy <strong>for this specific agent</strong> — not the generic seven, but the ones you actually observed, with their trace signatures.</p>
+<h3 id="07-ship-and-defend-10">07 · Ship and defend — 10%</h3>
+<p>Ten-minute demo, ten-minute panel defence.</p>
+<h2 id="the-three-things-that-make-this-real">The three things that make this real</h2>
+<p><strong>A hard cost ceiling, set at stage 1 and enforced in CI.</strong> You commit to a number per task before you know whether you can hit it. If you cannot, you change the design, not the number — and if you do change the number, that is a Decision Log entry explaining why the original estimate was wrong.</p>
+<figure class="code" data-lang="yaml"><div class="code-title">.github/workflows/capstone.yml</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-yaml">- name: Evals with the stage-1 cost gate
+  run: |
+    python -m evals.run \
+      --tier easy,realistic \
+      --repeats 3 \
+      --min-pass-rate easy=1.0,realistic=0.85 \
+      --max-usd-per-task 0.18 \
+      --job-cost-cap 6.00
+  # --max-usd-per-task is the ceiling committed at stage 1. Raising it is a
+  # code change, reviewed like any other, and it requires a Decision Log entry.
+  # --job-cost-cap stops the eval job itself becoming the incident.</code></pre></figure>
+<p><strong>A required failure demo.</strong> You will demonstrate your agent failing gracefully under a fault <strong>chosen by the panel, not by you</strong>. A dependency that times out, a tool returning malformed data, a budget exhausted mid-task. What we are looking for: does it degrade, escalate or abort as your design says it should, and does the user learn something true about what happened?</p>
+<p><strong>A scope change at day 5.</strong> Your stakeholder will change a requirement. This is not hazing; it is the single most reliable feature of real projects. Graded on how you handle it: what you renegotiate, what you absorb, what you refuse, what you write down. A project plan that cannot survive one change was not a plan.</p>
+<h2 id="the-defence-panel">The defence panel</h2>
+<p>Two mandatory questions, known in advance, because knowing them in advance does not make them easier.</p>
+<p><strong>"What happens at 10× traffic?"</strong> Ten times the volume. Where does it break first — rate limits, cost, latency, a downstream dependency, the human review queue? What is the actual bottleneck, and what would you do? "It would probably be fine" is a failing answer; so is "I'd add more workers" without a number.</p>
+<p><strong>"How would this be attacked?"</strong> Walk the trifecta. What does it read that an attacker can influence? What can it reach? What would exfiltration look like, concretely, and what stops it? If your answer is that the model would refuse, you have not answered.</p>
+<p>Then whatever else the panel finds. The best defences are from students who already know their system's weakest point and say so before being asked.</p>
+<h2 id="grading">Grading</h2>
+<div class="table-wrap"><table><thead><tr><th>Dimension</th><th>Weight</th><th>What earns marks</th></tr></thead><tbody><tr><td>Problem fit</td><td>20%</td><td>The right amount of autonomy, defended with the M4 framework</td></tr><tr><td>Engineering quality</td><td>20%</td><td>Tools, context, errors, traces — the gates applied, not recited</td></tr><tr><td>Evaluation rigour</td><td>25%</td><td>Real cases, validated judge, trajectory assertions, CI</td></tr><tr><td>Security posture</td><td>20%</td><td>Threat model, hardening, honest residual risk</td></tr><tr><td>Decision Log judgement</td><td>15%</td><td>Reasoning, alternatives, and what would change your mind</td></tr></tbody></table></div>
+<p>Passing is 70% overall <strong>and</strong> a defence that survives both mandatory questions.</p>
+<p>Note that evaluation rigour outweighs the build. That is not an accident, and it is the same claim the course has been making since M4: the thing that separates a demo from a product is whether anyone can tell if it works.</p>
+<aside class="callout c-autopsy"><h4>Delivered in public</h4><div class="callout-body"><p>Panel feedback is given in front of the cohort, to everyone's benefit. You will learn more from watching six defences than from your own, because you will see six different ways of being wrong that each looked completely reasonable from the inside.</p>
+<p>The most common failure in this room is not a broken agent. It is an author who cannot say what their agent is bad at.</p></div></aside>
+<aside class="callout c-lab"><h4>The whole thing</h4><div class="callout-body"><p><code>labs/lab16_capstone</code> contains the scaffold: the Decision Log template, the seven-stage checklist, the CI configuration with the cost gate, the threat-model template, and the brief bank if you do not have your own problem.</p>
+<p><code>python -m lab16_capstone.checklist</code> reports which stage artifacts exist and which gates pass — run it from day one, not day thirteen. It is deliberately a poor way to discover on day thirteen that stage 2 was never committed.</p></div></aside>
+<h2 id="where-to-go-next">Where to go next</h2>
+<p>You now have a spine: build the loop, see it, evaluate it, harden it, cost it, ship it. Three habits worth keeping:</p>
+<p><strong>Keep the Observatory.</strong> Every new agent gets traced from turn one. The habit of looking is the whole difference.</p>
+<p><strong>Keep writing evals first.</strong> It stays uncomfortable and it stays correct.</p>
+<p><strong>Keep the trifecta audit as a reflex.</strong> Every new tool, every new connector, every new memory directory. It takes thirty seconds and it is the highest-value thirty seconds in your review process.</p>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>≥70% across problem fit, engineering quality, evaluation rigour, security posture, and Decision Log judgement — plus a defence that survives both mandatory questions.</p>
+<p style="margin-top:9px"><code>python -m lab16_capstone.checklist</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab16_capstone" style="margin-right:8px">lab16_capstone &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M16">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m15.html"><span class="dir">&#8592; previous</span><span class="t">M15 &middot; Applied patterns: eight domains, eight architectures</span></a><a class="next" href="../index.html"><span class="dir">done &#8594;</span><span class="t">Course index</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m16", "questions": [{"q": "Why is the eval suite required to be committed before any agent code?", "options": ["So the eval set can be reused by other students", "Because writing it first forces you to define success \u2014 and discovering you cannot is far better in week one than in week two", "Because CI needs it configured before the first build", "To prevent the agent from being tuned to the eval set"], "answer": 1, "why": "Eval-first design is the heaviest-weighted stage precisely because it is where projects live or die. Writing it after the agent means writing it around what the agent already does. Writing it first surfaces \"I cannot define success here\" while there is still time to change the problem."}, {"q": "Your stage-1 cost ceiling turns out to be unachievable with your architecture. What is the correct response?", "options": ["Raise the ceiling to a number you can hit", "Change the design, or change the number with a Decision Log entry explaining why the original estimate was wrong", "Remove the CI cost gate for the final submission", "Reduce the eval set so fewer runs are needed"], "answer": 1, "why": "The ceiling is a commitment made before you knew whether you could hit it, which is what makes it real. Redesign is the first option; revising the number is legitimate only as an explicit, reasoned Decision Log entry \u2014 that is the judgement the grading is looking for."}, {"q": "The panel asks \"how would this be attacked?\". Which answer fails?", "options": ["A trifecta walk naming what the agent reads, what it can reach, and what stops exfiltration", "\"The model is trained to resist prompt injection and would refuse.\"", "A concrete exfiltration path plus the control that breaks it", "An attack the student could not defend against, with the residual risk stated"], "answer": 1, "why": "\"The model would refuse\" is a mitigation offered as a control \u2014 the exact error M11 exists to prevent. Note that the honest \"here is an attack I could not fix, and here is why I accept the risk\" scores <em>well</em>: it demonstrates the judgement being graded."}, {"q": "Two students submit similar agents. One scores substantially higher. What most likely explains it?", "options": ["A more ambitious feature set", "A better demo", "A rigorous eval suite and a Decision Log that states alternatives and what would change their mind", "More lines of code"], "answer": 2, "why": "Evaluation rigour (25%) and Decision Log judgement (15%) together outweigh the build (20%). An ambitious agent whose author cannot say what it does badly scores below a modest one whose author can \u2014 which is the claim the course has been making since M4."}, {"q": "The day-5 scope change is graded. What is it actually testing?", "options": ["Whether you can work quickly under pressure", "Whether you renegotiate, absorb, refuse and document deliberately \u2014 because a plan that cannot survive one change was not a plan", "Whether your code is modular enough", "Whether you can say no to a stakeholder"], "answer": 1, "why": "It is the most reliable feature of real projects, so it is part of the exercise. What is graded is the handling: what you renegotiate, what you absorb, what you decline, and \u2014 critically \u2014 what you write down about the trade-off you just made."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M3 &middot; Context: the finite resource — Building AI Agents</title>
+<meta name="description" content="Every token you add is a token of attention you spend. Context is a budget, not a bucket.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 0 &middot; M3</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M3</span><span class="pill core">core path</span><span class="pill">3.0 h</span><span class="pill">phase 0 &middot; Mechanics</span></div>
+  <h1>Context: the finite resource</h1>
+  <p class="line">Every token you add is a token of attention you spend. Context is a budget, not a bucket.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#context-is-a-budget-not-a-bucket">Context is a budget, not a bucket</a></li><li><a href="#what-actually-occupies-the-window">What actually occupies the window</a></li><li><a href="#system-prompt-altitude">System prompt altitude</a></li><li class="sub"><a href="#examples-compress-better-than-rules">Examples compress better than rules</a></li><li><a href="#just-in-time-retrieval">Just-in-time retrieval</a></li><li><a href="#the-three-long-horizon-strategies">The three long-horizon strategies</a></li><li class="sub"><a href="#compaction">Compaction</a></li><li class="sub"><a href="#structured-note-taking">Structured note-taking</a></li><li class="sub"><a href="#sub-agent-isolation">Sub-agent isolation</a></li><li class="sub"><a href="#choosing">Choosing</a></li><li><a href="#prompt-caching-as-context-economics">Prompt caching as context economics</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Treat the context window as an attention budget rather than a storage bucket</li><li>Predict which part of a long-running agent's context is actually eating the window</li><li>Pitch a system prompt at the right altitude between brittle rules and useless vagueness</li><li>Implement compaction, structured note-taking and sub-agent isolation behind one interface</li><li>Choose between them with numbers, and defend the choice</li><li>Order a request so the prompt cache actually hits, and notice when it stops</li></ul></div>
+<h2 id="context-is-a-budget-not-a-bucket">Context is a budget, not a bucket</h2>
+<p>The window is large. It is not free. Every token you put in is a token of attention the model spends somewhere, and attention is finite in a way that storage is not.</p>
+<p>The failure mode this produces is nastier than running out of space, because running out of space throws an error. This does not. Performance degrades <strong>gradually</strong> as context fills: recall gets patchier, instructions from early turns lose their grip, the model starts favouring whatever is nearest the end. Nothing raises. Nothing logs. Your evals drift down by a few points and someone blames the model version.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Every token you add is a token of attention you spend. Context is a budget, not a bucket.</p></div></aside>
+<p>The practical stance: <strong>know what is in your window and why.</strong> Most engineers cannot answer that question about their own agent, which is why the Observatory gets a context-occupancy view in this module.</p>
+<h2 id="what-actually-occupies-the-window">What actually occupies the window</h2>
+<p>For a long-running agent the breakdown is usually something like:</p>
+<div class="table-wrap"><table><thead><tr><th>Component</th><th>Typical share</th><th>Compressible?</th></tr></thead><tbody><tr><td>System prompt</td><td>1-5%</td><td>Rarely — it is small and load-bearing</td></tr><tr><td>Tool definitions</td><td>5-30%</td><td>Yes, via consolidation and tool search</td></tr><tr><td>Conversation turns</td><td>5-15%</td><td>Somewhat</td></tr><tr><td><strong>Tool results</strong></td><td><strong>50-85%</strong></td><td><strong>Yes — this is where the work is</strong></td></tr></tbody></table></div>
+<p>Tool results dominate, and almost nobody's mental model says so. A file read, a search result, a database query, an API response — each lands whole in the transcript and is re-sent on every subsequent turn. Turn 20 pays for the search result from turn 3 again.</p>
+<p>That single fact determines the strategy. Optimising your system prompt when tool results are 70% of the window is rearranging deck chairs.</p>
+<div class="widget" data-widget="context-budget" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<h2 id="system-prompt-altitude">System prompt altitude</h2>
+<p>There is a right height to fly at, and both extremes fail.</p>
+<p><strong>Too low</strong> is hardcoded logic: sprawling if-then rules for every situation you have encountered. Brittle, and it fails the moment reality supplies a situation you did not enumerate. It also grows without bound, because every incident adds a rule.</p>
+<p><strong>Too high</strong> is vague encouragement — "be helpful", "use good judgement". Nothing to act on, and it gives the model no way to know what <em>your</em> organisation considers correct.</p>
+<p>The altitude you want gives the model a clear frame plus the specifics that are genuinely non-obvious:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">You are a support triage agent for an enterprise SaaS product.
+
+Goal: correctly categorise and route each ticket, and answer directly when the
+answer is unambiguous and documented.
+
+Route to a human when: the customer mentions legal action, churn or a security
+incident; the account is Enterprise tier and the issue is unresolved after one
+exchange; or you are less than confident in the policy citation.
+
+Always cite the policy document you relied on. If no document covers the case,
+say so and route to a human rather than reasoning from first principles.
+
+Never quote pricing from memory — call `billing_get_plan`.</code></pre></figure>
+<p>Every line there is a decision the model could not have derived. None of it is a flowchart.</p>
+<h3 id="examples-compress-better-than-rules">Examples compress better than rules</h3>
+<p>Three or four <em>diverse, canonical</em> examples routinely outperform a page of rules, because an example carries tone, format, edge-case handling and judgement all at once, in fewer tokens.</p>
+<p>The word doing the work is <em>diverse</em>. Four examples of the same easy case teach nothing. Pick examples that span the space: the ordinary case, the ambiguous one, the one that must escalate, the one that looks in-scope but isn't.</p>
+<h2 id="just-in-time-retrieval">Just-in-time retrieval</h2>
+<p>The reflex from RAG systems is to pre-load: gather everything possibly relevant, stuff it in, let the model sort it out. For agents there is a better default.</p>
+<p><strong>Carry identifiers, load on demand.</strong> Instead of pasting five documents into context, give the agent a list of what exists — titles, ids, one-line summaries — and a tool to fetch any of them. The model reads the list, decides which two matter, and loads those.</p>
+<p>This works because the model can see the shape of the corpus without paying for its contents, and because a file path or a row id is itself information: <code>2026-q3-revenue-final.xlsx</code> tells you something before you open it. It also means the agent's context reflects what it actually needed rather than what you guessed it might.</p>
+<p>Progressive disclosure is the same idea one level up, and it is exactly how skills work in M14: always-loaded name and description, body when relevant, referenced files on demand.</p>
+<p>Classic pre-loading still wins when the corpus is small and every document is relevant, or when latency matters more than tokens and you can afford the round trips saved. Decide deliberately.</p>
+<h2 id="the-three-long-horizon-strategies">The three long-horizon strategies</h2>
+<p>Eventually the transcript outgrows the window, or outgrows the point where the model reasons well over it. There are three answers, and mature agents use all three.</p>
+<h3 id="compaction">Compaction</h3>
+<p>At a threshold, summarise the conversation so far and continue from the summary plus the most recent turns.</p>
+<figure class="code" data-lang="python"><div class="code-title">strategies/compaction.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def compact(client, messages, keep_recent=10):
+    &quot;&quot;&quot;Summarise everything older than the last N turns.&quot;&quot;&quot;
+    old, recent = messages[:-keep_recent], messages[-keep_recent:]
+    if not old:
+        return messages
+
+    summary = client.messages.create(
+        model=&quot;claude-opus-5&quot;,
+        max_tokens=2000,
+        system=(
+            &quot;Summarise this agent transcript for its own future reference. &quot;
+            &quot;Preserve: the goal, decisions made and why, facts discovered with &quot;
+            &quot;their sources, files or records touched, and what remains to be done. &quot;
+            &quot;Discard: exploration that led nowhere, raw tool output already &quot;
+            &quot;acted on, and pleasantries.&quot;
+        ),
+        messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: render(old)}],
+    )
+    return [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: f&quot;&lt;summary_of_earlier_work&gt;\n&quot;
+                                        f&quot;{summary.content[0].text}\n&quot;
+                                        f&quot;&lt;/summary_of_earlier_work&gt;&quot;}] + recent</code></pre></figure>
+<p>The summarisation prompt <em>is</em> the strategy. A generic "summarise this" loses exactly the things the agent needs — which record it already updated, which approach it already ruled out — and the agent repeats work it has no memory of having done.</p>
+<p>The API can also do this server-side: compaction (beta header <code>compact-2026-01-12</code>) summarises earlier context automatically as you approach a threshold. If you use it, <strong>append the whole <code>response.content</code> back into your messages</strong>, not just the text — the compaction blocks are how the API knows what it already summarised, and extracting only text silently loses that state.</p>
+<p>A lighter-weight relative is context editing (beta <code>context-management-2025-06-27</code>), which <em>clears</em> old tool results rather than summarising them: <code>context_management={&quot;edits&quot;: [{&quot;type&quot;: &quot;clear_tool_uses_20250919&quot;}]}</code>. Given that tool results are 50-85% of the window, clearing the stale ones is often the highest-value single change available.</p>
+<h3 id="structured-note-taking">Structured note-taking</h3>
+<p>The agent maintains a file outside the context window and reads it back when it needs to.</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">## Goal
+Reconcile Q3 revenue between the ledger export and the board deck.
+
+## Established
+- Ledger total: 2,143,880 (source: ledger_q3.csv, read turn 4)
+- Deck total:   2,151,200 (source: board_q3.pdf p.12, read turn 7)
+- Delta: 7,320 — matches the unbilled-usage accrual (turn 11)
+
+## Ruled out
+- FX differences: both figures are USD-native (turn 9)
+
+## Next
+- Confirm the accrual with the revenue team&#x27;s memo</code></pre></figure>
+<p>Cheap, legible, debuggable, and it survives process death — which makes it the foundation of memory in M7. The discipline it needs is hygiene: notes that only grow become their own context problem.</p>
+<h3 id="sub-agent-isolation">Sub-agent isolation</h3>
+<p>Give the sub-task its own context window. The sub-agent explores, reads twenty documents, burns 80,000 tokens, and returns a two-paragraph finding. The orchestrator's context grows by two paragraphs, not by eighty thousand tokens.</p>
+<p>This is the most powerful of the three and the most expensive. It is also the whole subject of M9, where you will find that the token multiple is real and the quality gain has a knee.</p>
+<h3 id="choosing">Choosing</h3>
+<div class="table-wrap"><table><thead><tr><th></th><th>Compaction</th><th>Note-taking</th><th>Sub-agents</th></tr></thead><tbody><tr><td>Best for</td><td>Long single-threaded conversations</td><td>Multi-session, resumable work</td><td>Parallel exploration</td></tr><tr><td>Cost</td><td>An extra call per compaction</td><td>Near zero</td><td>High — a full context per worker</td></tr><tr><td>Fails when</td><td>The summary drops something load-bearing</td><td>Notes rot or grow unbounded</td><td>Workers duplicate or contradict</td></tr><tr><td>Survives a crash</td><td>No</td><td>Yes</td><td>Partially</td></tr></tbody></table></div>
+<h2 id="prompt-caching-as-context-economics">Prompt caching as context economics</h2>
+<p>Caching does not reduce what is in your window. It reduces what you pay to re-send it — often by an order of magnitude — which changes which designs are affordable.</p>
+<p>The mechanic that matters is that caching is a <strong>prefix match</strong>. The request renders in a fixed order — <code>tools</code>, then <code>system</code>, then <code>messages</code> — and any byte that changes anywhere in the prefix invalidates everything after it.</p>
+<p>Which gives you the rule: <strong>stable content first, volatile content last.</strong></p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">response = client.messages.create(
+    model=&quot;claude-opus-5&quot;,
+    max_tokens=16000,
+    tools=TOOLS,                       # frozen, deterministic order
+    system=[{
+        &quot;type&quot;: &quot;text&quot;,
+        &quot;text&quot;: SYSTEM_PROMPT,          # no timestamps, no per-request ids
+        &quot;cache_control&quot;: {&quot;type&quot;: &quot;ephemeral&quot;},
+    }],
+    messages=messages,                  # the volatile part, after the breakpoint
+)
+
+# Verify. Silence is not success.
+print(response.usage.cache_read_input_tokens)</code></pre></figure>
+<p>The mistakes that silently cost you real money, in rough order of how often they happen:</p>
+<ul><li><strong>A timestamp in the system prompt.</strong> <code>&quot;Current time: 2026-08-19T14:22:31Z&quot;</code> invalidates the cache on literally every request. If the model needs the time, put it in the user turn.</li><li><strong>Non-deterministic tool ordering.</strong> A tool list built from a <code>set</code> or a dict iteration that varies between processes. Sort it.</li><li><strong>Editing the system prompt mid-session</strong> to add an instruction. On supporting models, append a <code>{&quot;role&quot;: &quot;system&quot;, ...}</code> message to <code>messages[]</code> instead — the cached prefix survives, and it is the injection-safe channel for operator instructions.</li><li><strong>Switching models mid-session.</strong> Different model, different cache. Use a sub-agent for the cheap sub-task instead of switching the main loop.</li><li><strong>Adding or removing tools mid-session.</strong> Tool search appends definitions rather than swapping them, which is precisely why it preserves the cache.</li></ul>
+<p>Note the shape of every one of those: nothing fails, nothing warns, the bill just goes up. Watch <code>usage.cache_read_input_tokens</code>. If it is zero across repeated requests, something in your prefix is moving.</p>
+<aside class="callout c-autopsy"><h4>“Just use the big context window.”</h4><div class="callout-body"><p>Two runs of the same research task, both with room to spare. The first pre-loads forty documents because it can. The second carries a list of forty titles and loads the four it needs. The smaller-context run wins on accuracy — because the model's attention is not spread across thirty-six irrelevant documents — and it wins on latency and cost as well, by a wide margin. A large window is a safety margin, not a strategy. The question is never "does it fit", it is "does every token in here earn its place".</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 3 — Context surgery</h4><div class="callout-body"><p><code>labs/lab03_context</code> gives you a research agent that measurably degrades after about 25 turns. Implement all three long-horizon strategies behind the provided <code>ContextStrategy</code> interface, then run <code>python -m lab03_context.benchmark</code> to measure accuracy, tokens, latency and cost for each across a 60-turn workload.</p>
+<p>The gate: hold at least 90% of baseline accuracy at turn 60 under a fixed cost ceiling. Then write the recommendation — which strategy, for this workload, and what would change your mind.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 3b — Observatory v1</h4><div class="callout-body"><p>Extend your viewer with a stacked-bar context-occupancy timeline (system / tools / history / results, per turn) and a cache-hit indicator. When you can see occupancy over time, the degradation curve stops being mysterious.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents">Effective context engineering for AI agents</a></li><li><a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">Prompt caching</a></li><li><a href="https://docs.anthropic.com/en/docs/build-with-claude/context-editing">Context editing and compaction</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Research agent holds ≥90% of baseline accuracy at turn 60 under a fixed cost ceiling.</p>
+<p style="margin-top:9px"><code>pytest labs/lab03_context -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab03_context" style="margin-right:8px">lab03_context &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M3">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m02.html"><span class="dir">&#8592; previous</span><span class="t">M2 &middot; Tools: designing the agent&#x27;s hands</span></a><a class="next" href="m04.html"><span class="dir">next &#8594;</span><span class="t">M4 &middot; Workflows vs. Agents: choosing the right autonomy</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m03", "questions": [{"q": "For a long-running agent, which component typically occupies the largest share of the context window?", "options": ["The system prompt", "Tool definitions", "Tool results", "The user's messages"], "answer": 2, "why": "Tool results are usually 50-85% of the window \u2014 file reads, search results, API responses, each landing whole and being re-sent on every subsequent turn. This is why context editing (which clears stale tool results) is often the single highest-value change available, and why optimising the system prompt first is misdirected effort."}, {"q": "Your system prompt begins \"Current time: {now}\". What is the effect on prompt caching?", "options": ["None \u2014 timestamps are excluded from the cache key", "The cache is invalidated on every request, silently", "Only the system block is re-billed; tools still hit the cache", "The request fails with a cache validation error"], "answer": 1, "why": "Caching is a prefix match over tools \u2192 system \u2192 messages. A changing byte in the system block invalidates it and everything after it, on every single request. Nothing errors and nothing warns \u2014 you find out from the invoice, or from watching <code>usage.cache_read_input_tokens</code> sit at zero."}, {"q": "Context rot is described as a gradient rather than a cliff. Why does that make it more dangerous?", "options": ["Because the degradation is faster than a cliff would be", "Because it eventually throws an error that is hard to catch", "Because performance degrades with no error, warning or log entry \u2014 so it is attributed to the model rather than the design", "Because it only affects the most recent turns"], "answer": 2, "why": "A hard limit at least tells you it was hit. Gradual degradation just makes answers quietly worse: recall gets patchier and early instructions lose their grip, with nothing in the logs. Teams routinely blame a model version for what is a context-design problem."}, {"q": "You are choosing a long-horizon strategy for a task that spans several sessions and must survive the process being killed. Which fits best?", "options": ["Compaction", "Structured note-taking", "Sub-agent isolation", "A larger context window"], "answer": 1, "why": "Compaction lives in the conversation, so it dies with the process. Sub-agent isolation helps with parallel exploration, not persistence. Notes are written outside the context window to durable storage, which is exactly what surviving a restart requires \u2014 and is the foundation of memory in M7."}, {"q": "Which of these best describes just-in-time retrieval?", "options": ["Pre-loading every plausibly relevant document before the first turn", "Giving the agent identifiers and a fetch tool, so it loads only what it decides it needs", "Compressing documents before adding them to context", "Caching retrieved documents so the second load is cheaper"], "answer": 1, "why": "Carry identifiers, load on demand. The agent sees the shape of the corpus \u2014 titles, ids, one-line summaries \u2014 without paying for its contents, then pulls the two documents that matter. Context ends up reflecting what was actually needed rather than what you guessed."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

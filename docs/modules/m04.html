@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M4 &middot; Workflows vs. Agents: choosing the right autonomy — Building AI Agents</title>
+<meta name="description" content="The most common architectural error in this field is reaching for an agent when a workflow would do.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 1 &middot; M4</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M4</span><span class="pill core">core path</span><span class="pill">2.5 h</span><span class="pill">phase 1 &middot; Building blocks</span></div>
+  <h1>Workflows vs. Agents: choosing the right autonomy</h1>
+  <p class="line">The most common architectural error in this field is reaching for an agent when a workflow would do.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-distinction-that-matters">The distinction that matters</a></li><li><a href="#the-five-workflow-patterns">The five workflow patterns</a></li><li class="sub"><a href="#1-prompt-chaining">1. Prompt chaining</a></li><li class="sub"><a href="#2-routing">2. Routing</a></li><li class="sub"><a href="#3-parallelisation">3. Parallelisation</a></li><li class="sub"><a href="#4-orchestrator-workers">4. Orchestrator-workers</a></li><li class="sub"><a href="#5-evaluator-optimiser">5. Evaluator-optimiser</a></li><li><a href="#the-autonomous-agent">The autonomous agent</a></li><li><a href="#the-price-list">The price list</a></li><li><a href="#a-decision-framework-you-can-reuse">A decision framework you can reuse</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>State the difference between a workflow and an agent in terms of who controls the path</li><li>Implement all five workflow patterns, not just recognise them</li><li>Price autonomy honestly in latency, tokens, error surface and debuggability</li><li>Apply a repeatable decision framework and write down the answer</li><li>Recognise when the right answer is "this should not be an agent"</li></ul></div>
+<h2 id="the-distinction-that-matters">The distinction that matters</h2>
+<p><strong>Workflows</strong> orchestrate models and tools through predefined code paths. You wrote the control flow; the model fills in the steps.</p>
+<p><strong>Agents</strong> let the model direct its own process — deciding which tools to use, in what order, for how many steps, based on what it finds.</p>
+<p>The line is not sophistication, it is <strong>who decides the path</strong>. A three-model workflow with careful prompt chaining is not "less advanced" than a one-model agent. It is a different, usually better, answer to a different question.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>The most common architectural error in this field is reaching for an agent when a workflow would do.</p></div></aside>
+<p>The reason this error is so common is social rather than technical. "Agentic" has become a synonym for "good", so the workflow feels like the compromise. Meanwhile the workflow is faster, cheaper, more predictable, easier to evaluate, and easier to explain to the person who has to be on call for it.</p>
+<div class="widget" data-widget="autonomy-chooser" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<h2 id="the-five-workflow-patterns">The five workflow patterns</h2>
+<p>You will implement all five in the lab against one problem. Descriptions are cheap; the numbers you get from building them are the point.</p>
+<h3 id="1-prompt-chaining">1. Prompt chaining</h3>
+<p>Decompose into fixed steps, each feeding the next, with optional programmatic gates between.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def chain(client, brief):
+    outline = ask(client, &quot;Write an outline for this brief.&quot;, brief)
+    if len(outline.split()) &lt; 30:                  # a gate, in code
+        return {&quot;status&quot;: &quot;rejected&quot;, &quot;reason&quot;: &quot;outline too thin&quot;}
+    draft = ask(client, &quot;Write the piece from this outline.&quot;, outline)
+    return {&quot;status&quot;: &quot;ok&quot;, &quot;text&quot;: ask(client, &quot;Tighten and fix errors.&quot;, draft)}</code></pre></figure>
+<p>Use it when the steps genuinely are fixed. You trade latency for accuracy on each subtask, and you get a natural place to put deterministic checks.</p>
+<h3 id="2-routing">2. Routing</h3>
+<p>Classify the input, then dispatch to a specialised handler.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">ROUTES = {&quot;billing&quot;: handle_billing, &quot;technical&quot;: handle_technical,
+          &quot;account&quot;: handle_account, &quot;other&quot;: handle_general}
+
+def route(client, ticket):
+    kind = classify(client, ticket, labels=list(ROUTES))   # cheap model, one call
+    return ROUTES[kind](client, ticket)                    # specialised prompt + tools</code></pre></figure>
+<p>Routing is the pattern most teams should have used and didn't. Each route gets a prompt tuned for one thing rather than a compromise prompt for everything, each is separately evaluable, and you can send the easy 80% to a cheaper model without touching the hard 20%.</p>
+<h3 id="3-parallelisation">3. Parallelisation</h3>
+<p>Two distinct shapes.</p>
+<p><strong>Sectioning</strong> splits a task into independent pieces run concurrently — process forty documents, review five aspects of one document at once. Latency drops to the slowest section.</p>
+<p><strong>Voting</strong> runs the <em>same</em> task several times and aggregates. Use it when you need confidence on a judgement call: three independent reviews of a code change catch more than one review does, and disagreement is itself a signal worth surfacing.</p>
+<h3 id="4-orchestrator-workers">4. Orchestrator-workers</h3>
+<p>A lead model decomposes the task dynamically, delegates to workers, and synthesises. The difference from sectioning is that the subtasks are <strong>not known in advance</strong> — the orchestrator decides them from the input.</p>
+<p>This is the multi-agent pattern, and it earns a whole module (M9) mostly because of what it costs.</p>
+<h3 id="5-evaluator-optimiser">5. Evaluator-optimiser</h3>
+<p>One model produces, another critiques against explicit criteria, loop until it passes or the budget runs out.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def evaluate_optimise(client, task, max_rounds=3):
+    draft = generate(client, task)
+    for _ in range(max_rounds):
+        verdict = critique(client, draft, CRITERIA)   # returns {passed, notes}
+        if verdict[&quot;passed&quot;]:
+            return draft
+        draft = revise(client, draft, verdict[&quot;notes&quot;])
+    return draft                                      # budget exhausted, return best effort</code></pre></figure>
+<p>It works when you can articulate the criteria clearly and when a critique genuinely improves the next draft — translation, writing with a style guide, code against a spec. It fails, expensively, when the criteria are vague: the critic generates plausible-sounding objections forever. <strong>Always cap the rounds.</strong> The loop must terminate on a budget, not on satisfaction.</p>
+<h2 id="the-autonomous-agent">The autonomous agent</h2>
+<p>Beyond all five sits the agent proper: open-ended, unpredictable step count, environmental feedback in the loop, running until it decides it is done or you stop it.</p>
+<p>It earns its place when the path genuinely cannot be enumerated — an unfamiliar codebase, an open-ended research question, a debugging session. The tell is that a competent human doing this task would also not be able to list the steps in advance.</p>
+<h2 id="the-price-list">The price list</h2>
+<p>Autonomy is a purchase. Here is what it costs, so you can decide whether you want it.</p>
+<div class="table-wrap"><table><thead><tr><th>You gain</th><th>You pay</th></tr></thead><tbody><tr><td>Handles cases you did not enumerate</td><td>Latency: unpredictable step count, often 5-20× a single call</td></tr><tr><td>Recovers from unexpected failures</td><td>Tokens: the whole transcript re-sent every turn, growing quadratically</td></tr><tr><td>No flowchart to maintain</td><td>Error surface: every turn is a chance to go wrong, and errors compound</td></tr><tr><td>Improves as models improve</td><td>Debuggability: "why did it do that" has no stack trace</td></tr><tr><td>One implementation for many cases</td><td>Evaluability: many valid paths make correctness hard to assert</td></tr></tbody></table></div>
+<p>None of those are reasons never to build an agent. They are the reasons to be able to say, out loud, why this task needs one.</p>
+<h2 id="a-decision-framework-you-can-reuse">A decision framework you can reuse</h2>
+<p>Five questions. Answer them in writing, in your Decision Log, before you write code.</p>
+<p><strong>1. Can you enumerate the steps in advance?</strong> If you can draw the flowchart, build the flowchart.</p>
+<p><strong>2. Does the next step depend on what earlier steps discovered?</strong> Shallow dependence is routing. Deep, repeated dependence is where agents start to pay.</p>
+<p><strong>3. Is the task worth more than the compute?</strong> An agent run that costs $0.50 is fine for a task worth $50 and absurd for one worth $0.05. Do this arithmetic before building, not after rollout.</p>
+<p><strong>4. Are the actions reversible?</strong> Irreversible actions do not forbid autonomy, but they change the design: dry-run modes, approval gates (M13), and a much smaller blast radius.</p>
+<p><strong>5. Can you evaluate it?</strong> If you cannot tell automatically whether a run succeeded, you cannot tune it, cannot catch regressions, and will not know it broke until a user tells you.</p>
+<aside class="callout c-warn"><h4>Question 5 is a veto</h4><div class="callout-body"><p>The other four are trade-offs. This one is not. If the honest answer is no, the work in front of you is building the eval set (M8) — not building the agent. An agent you cannot measure is not a prototype, it is a liability with a demo.</p></div></aside>
+<aside class="callout c-autopsy"><h4>“Agentic” as a synonym for “good”</h4><div class="callout-body"><p>Three post-mortems, same shape. A document-classification pipeline rebuilt as an agent: 6× the cost, 4× the latency, and <em>worse</em> accuracy, because the fixed pipeline's per-stage prompts were tuned and the agent's general prompt was not. An internal search tool given a full agent loop when a single retrieval call answered 90% of queries — the loop's extra turns mostly re-searched. And a data-entry automation where the agent's flexibility became the bug: it "helpfully" corrected values the customer had deliberately entered. In all three, no one had asked question 1.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 4 — Five patterns, one problem</h4><div class="callout-body"><p><code>labs/lab04_patterns</code> gives you a support-email triage task and a 40-case eval set. Implement all five patterns plus an autonomous agent against the same interface, then run <code>python -m lab04_patterns.compare</code> to produce the table: accuracy, p50 and p95 latency, cost, and lines of code.</p>
+<p>Write the recommendation memo. Most students find routing beats the agent on this task — cheaper, faster, more accurate — and that is the lesson, not a trick. This is your first graded Decision Log entry: state the choice, the numbers behind it, and what evidence would change your mind.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents</a></li><li><a href="https://docs.anthropic.com/en/docs/agents-and-tools/agent-design">Agent design patterns</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>All five implementations pass; comparison table complete; memo defends a choice with numbers. First graded Decision Log entry.</p>
+<p style="margin-top:9px"><code>pytest labs/lab04_patterns -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab04_patterns" style="margin-right:8px">lab04_patterns &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M4">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m03.html"><span class="dir">&#8592; previous</span><span class="t">M3 &middot; Context: the finite resource</span></a><a class="next" href="m05.html"><span class="dir">next &#8594;</span><span class="t">M5 &middot; The Claude Agent SDK: from hand-rolled to harness</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m04", "questions": [{"q": "What actually distinguishes a workflow from an agent?", "options": ["Agents use tools; workflows do not", "Agents use more capable models", "In a workflow the control flow is in your code; in an agent the model directs its own path", "Workflows are single-turn; agents are multi-turn"], "answer": 2, "why": "The distinction is who decides the path. Workflows orchestrate through predefined code paths you wrote; agents let the model choose tools, order and step count from what it finds. Both can be multi-turn and both use tools."}, {"q": "You can articulate clear quality criteria, and a second pass measurably improves the output. Which pattern fits, and what must you add?", "options": ["Routing, plus a fallback route", "Evaluator-optimiser, plus a hard cap on iterations", "Voting, plus a tie-break rule", "An autonomous agent, plus a turn cap"], "answer": 1, "why": "Explicit criteria plus measurable improvement on revision is exactly evaluator-optimiser's shape. The cap is non-negotiable: with vague criteria the critic will generate plausible objections indefinitely, so the loop must terminate on a budget rather than on satisfaction."}, {"q": "In the decision framework, which question functions as a veto rather than a trade-off?", "options": ["Can you enumerate the steps?", "Is the task worth more than the compute?", "Are the actions reversible?", "Can you evaluate it automatically?"], "answer": 3, "why": "Cost, reversibility and enumerability are trade-offs you can decide to accept. Evaluability is not: without it you cannot tune the system, cannot detect a regression, and will learn about failures from users. If the answer is no, the next piece of work is the eval set, not the agent."}, {"q": "A support team routes 5,000 tickets a day. 80% fall into four well-understood categories. What is the strongest starting architecture?", "options": ["An autonomous agent with access to all support tools", "A routing workflow, with an escalation path for the remaining 20%", "Orchestrator-workers, one worker per category", "Evaluator-optimiser over a single general handler"], "answer": 1, "why": "Routing gives each category a prompt tuned for one job and separately evaluable, lets the easy majority go to a cheaper model, and keeps the control flow visible. Orchestrator-workers pays a large token multiple for parallelism this task does not need, and full autonomy adds unpredictability to a high-volume, low-value-per-task workload."}, {"q": "Which is <em>not</em> part of the price of autonomy?", "options": ["Latency grows with an unpredictable step count", "Token cost grows quadratically as the transcript is re-sent", "Model quality degrades as the agent takes more steps", "\"Why did it do that\" has no stack trace"], "answer": 2, "why": "The model does not get worse per se \u2014 but the conditions do. What you actually pay is latency, tokens, a larger error surface, reduced debuggability and harder evaluation. (Context rot from M3 is a real effect, but it is a consequence of what you put in the window, not of autonomy itself.)"}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M12 &middot; Cost, latency and reliability engineering — Building AI Agents</title>
+<meta name="description" content="The prototype cost $2 a day. The rollout costs $40,000 a month. Have this conversation first.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 3 &middot; M12</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M12</span><span class="pill core">core path</span><span class="pill">3.0 h</span><span class="pill">phase 3 &middot; Production</span></div>
+  <h1>Cost, latency and reliability engineering</h1>
+  <p class="line">The prototype cost $2 a day. The rollout costs $40,000 a month. Have this conversation first.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#have-the-conversation-first">Have the conversation first</a></li><li><a href="#build-the-model">Build the model</a></li><li><a href="#prompt-caching-in-earnest">Prompt caching in earnest</a></li><li><a href="#model-routing">Model routing</a></li><li><a href="#latency">Latency</a></li><li><a href="#reliability-under-statefulness">Reliability under statefulness</a></li><li><a href="#the-retry-storm">The retry storm</a></li><li><a href="#graceful-degradation-and-budget-policy">Graceful degradation and budget policy</a></li><li><a href="#rainbow-deployments">Rainbow deployments</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Build a cost model before the rollout, and find its dominant term</li><li>Use prompt caching in earnest, and detect the changes that silently break it</li><li>Route work by difficulty without letting quality fall through the floor</li><li>Understand why agent p95 latency is driven by turn count, not per-turn speed</li><li>Make a stateful system survive faults with checkpointing and durable execution</li><li>Deploy without disrupting agents that are mid-task</li></ul></div>
+<h2 id="have-the-conversation-first">Have the conversation first</h2>
+<p>The prototype costs two dollars a day. Then it goes to 5,000 users and costs forty thousand a month, and the conversation about whether that is acceptable happens <em>after</em> everyone is depending on it.</p>
+<p>Have it first. The arithmetic takes twenty minutes.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>The prototype cost $2 a day. The rollout costs $40,000 a month. Have this conversation first.</p></div></aside>
+<h2 id="build-the-model">Build the model</h2>
+<p>Cost per task decomposes into five terms:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">cost_per_task =
+      input_tokens  x turns x (cache-adjusted input price)
+    + output_tokens x turns x output price
+    + tool_definition_surcharge x turns
+    + server_tool_fees                      (web search, code execution)
+    x (1 + subagent_multiplier)             (M9)</code></pre></figure>
+<p>The term that surprises people is the first, and specifically <strong>how it grows</strong>. On turn <em>n</em> you re-send the entire transcript. Across a task of <em>n</em> turns, history tokens accumulate as n(n−1)/2 — quadratic, not linear. A 20-turn task does not cost twice a 10-turn task. It costs roughly four times.</p>
+<p>This single fact reorders every optimisation you might attempt. Halving your turn count beats halving your model price.</p>
+<div class="widget" data-widget="cost-model" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<p>Prices change, so treat them as inputs rather than constants. Check the current published rates, put them in one config, and make your cost model read from it. As a rough shape at the time of writing: Haiku-class models sit around a dollar per million input tokens, Sonnet-class around three, Opus-class around five, with output at roughly five times input — and cache reads roughly a tenth of the input price. Verify before quoting.</p>
+<h2 id="prompt-caching-in-earnest">Prompt caching in earnest</h2>
+<p>Caching is the highest-leverage cost lever available and it is nearly free to adopt. The mechanics from M3, applied with intent:</p>
+<p><strong>Order for a stable prefix.</strong> Requests render <code>tools</code> → <code>system</code> → <code>messages</code>. Everything stable goes first, everything volatile last.</p>
+<p><strong>Place breakpoints deliberately.</strong> You get up to four. Typically: end of tools, end of system prompt, and a rolling one in the conversation. Below roughly 1,024 tokens a prefix will not cache at all — silently.</p>
+<p><strong>Verify.</strong> <code>usage.cache_read_input_tokens</code> is the only honest signal. Zero across repeated requests means something is moving.</p>
+<p>The changes that silently double your bill, all of which pass code review:</p>
+<div class="table-wrap"><table><thead><tr><th>Change</th><th>Why it breaks the cache</th></tr></thead><tbody><tr><td>A timestamp in the system prompt</td><td>Prefix differs on every single request</td></tr><tr><td>Tool list built from a set or dict</td><td>Order varies between processes</td></tr><tr><td>Appending an instruction to <code>system</code> mid-session</td><td>The prefix changed; use a <code>{&quot;role&quot;:&quot;system&quot;}</code> message instead</td></tr><tr><td>Switching model mid-session</td><td>Different model, different cache</td></tr><tr><td>Adding or removing a tool mid-session</td><td>Tools render first; use tool search, which appends</td></tr><tr><td>A per-request ID early in the prompt</td><td>Same as the timestamp</td></tr></tbody></table></div>
+<p>Every row is invisible in testing and expensive in production. Put cache hit rate on a dashboard (M10) so a regression is a graph, not a quarterly surprise.</p>
+<h2 id="model-routing">Model routing</h2>
+<p>Not every step needs your best model. Classification, extraction, simple formatting and much judging run well on a small model; planning and synthesis need a strong one.</p>
+<figure class="code" data-lang="python"><div class="code-title">routing.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def choose_model(step, complexity):
+    &quot;&quot;&quot;Route by step type, with a quality floor that overrides the cheap path.&quot;&quot;&quot;
+    if step in (&quot;classify&quot;, &quot;extract&quot;, &quot;format&quot;):
+        return &quot;claude-haiku-4-5&quot;
+    if step == &quot;judge&quot; and complexity &lt; 0.6:
+        return &quot;claude-haiku-4-5&quot;
+    if step in (&quot;plan&quot;, &quot;synthesise&quot;):
+        return &quot;claude-opus-5&quot;
+    return &quot;claude-sonnet-5&quot;</code></pre></figure>
+<p>Two disciplines make routing safe rather than merely cheap:</p>
+<p><strong>A quality floor.</strong> Route cheap, then measure with your M8 suite <em>per route</em>. A route that drops below its floor gets promoted back. Without this, routing is just a way to make your product worse for money.</p>
+<p><strong>Don't switch mid-session.</strong> Changing model in the middle of a conversation invalidates the cache and can cost more than the model saved. Spawn a sub-agent for the cheap sub-task and keep the main loop on one model.</p>
+<p>Also consider the Batch API for anything not latency-sensitive — overnight evals, bulk classification, backfills. Roughly half price for work nobody is waiting on.</p>
+<h2 id="latency">Latency</h2>
+<p>The thing people get wrong: <strong>agent p95 is dominated by turn count, not per-turn speed.</strong></p>
+<p>A 400ms improvement per turn is 400ms on a one-turn task and meaningless against a task that sometimes takes 25 turns. The tail is made of runs that took many more turns than the median, so the levers that matter are:</p>
+<ul><li><strong>Fewer turns.</strong> Tool consolidation (M2) removes round trips wholesale.</li><li><strong>Parallel tool execution.</strong> Independent calls concurrently — the M1 lesson, and still the most common avoidable latency in production agents.</li><li><strong>Streaming.</strong> Does not reduce latency; substantially reduces <em>perceived</em> latency, which is what users report on.</li><li><strong>Prefetching.</strong> If a tool is almost always called first, call it before the model asks.</li><li><strong>A turn cap tuned from data.</strong> The p99 run that takes 40 turns is usually thrashing, not working.</li></ul>
+<h2 id="reliability-under-statefulness">Reliability under statefulness</h2>
+<p>Stateless services taught us that a failed request is retried and forgotten. Agents are not stateless, and the same fault has very different consequences.</p>
+<p>A crash on turn 18 of a 20-turn task loses eighteen turns of work <em>and</em> the money spent producing them. Do it under load and you have an outage that is also a bill.</p>
+<p><strong>Checkpoint after every turn.</strong> Messages, tool state, budget spent, memory pointers. Resumption should be the normal recovery path, not an exotic one.</p>
+<p><strong>Make tool calls idempotent, or make them safe to repeat.</strong> If a resumed agent re-issues <code>send_email</code>, an idempotency key is the difference between a resume and an incident.</p>
+<p><strong>Durable execution.</strong> For long-running agents, a workflow engine that persists state transitions lets a worker die mid-task and another pick it up. The alternative — restart from zero — becomes untenable exactly when tasks become valuable.</p>
+<p><strong>Design tool errors an agent can recover from.</strong> M2's lesson with money attached: an error that says what is wrong and what to try instead converts a failed run into a degraded one.</p>
+<h2 id="the-retry-storm">The retry storm</h2>
+<p>Naive retries turn a blip into an outage, and they do it in a way that looks locally reasonable.</p>
+<p>Rate limit hits. Every in-flight agent retries immediately. The retries arrive together, are also rate-limited, and retry again. Now you have more load than the original traffic, sustained, with the provider's limiter guaranteeing every one of them fails — and each retry re-sends a full transcript, so the bill grows while the success rate is zero.</p>
+<p>Three things prevent it, and you need all three:</p>
+<figure class="code" data-lang="python"><div class="code-title">reliability.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">import random, time
+
+
+def backoff_delay(attempt, base=1.0, cap=60.0):
+    &quot;&quot;&quot;Exponential with full jitter. The jitter is the part that matters:
+    without it, every client retries in lockstep and re-creates the spike.&quot;&quot;&quot;
+    return random.uniform(0, min(cap, base * 2 ** attempt))
+
+
+class CircuitBreaker:
+    &quot;&quot;&quot;Stop calling a service that is down. Retrying a hard-down dependency is
+    load you generate against yourself.&quot;&quot;&quot;
+
+    def __init__(self, threshold=5, recovery_s=30):
+        self.threshold, self.recovery_s = threshold, recovery_s
+        self.failures, self.opened_at = 0, None
+
+    def allow(self):
+        if self.opened_at and time.time() - self.opened_at &gt; self.recovery_s:
+            self.opened_at, self.failures = None, 0     # half-open: try one
+        return self.opened_at is None
+
+    def record(self, ok):
+        if ok:
+            self.failures, self.opened_at = 0, None
+        else:
+            self.failures += 1
+            if self.failures &gt;= self.threshold:
+                self.opened_at = time.time()</code></pre></figure>
+<p>And the third: a <strong>budget guard</strong> that aborts the run when spend crosses the ceiling, regardless of what the retry logic thinks it is doing. Retries are how a bug becomes expensive; the budget guard is what bounds the damage.</p>
+<h2 id="graceful-degradation-and-budget-policy">Graceful degradation and budget policy</h2>
+<p>Decide <em>in advance</em> what happens when a limit is hit. There are three answers and they are product decisions, not engineering ones:</p>
+<ul><li><strong>Degrade</strong> — finish with a cheaper model, fewer workers, or a partial answer clearly marked as partial.</li><li><strong>Escalate</strong> — hand to a human with the work so far attached.</li><li><strong>Abort</strong> — stop and report honestly.</li></ul>
+<p>Whichever you choose, say it out loud in the Decision Log, and set budgets per session, per tenant <em>and</em> per task. A per-session cap does not stop one tenant consuming everything.</p>
+<h2 id="rainbow-deployments">Rainbow deployments</h2>
+<p>The constraint stateless services never taught you: <strong>you have agents mid-task during a deploy.</strong></p>
+<p>Kill a pod and you kill a 20-turn task at turn 12. Multiply by concurrent load. A rolling deploy that is invisible for a web service is a mass-cancellation event for an agent fleet.</p>
+<p>Rainbow deployments shift traffic gradually and let old versions keep running until their in-flight work completes. New tasks go to the new version; existing tasks finish where they started. It costs you running two versions concurrently for a while, which means both must tolerate the same session format — a compatibility constraint worth knowing about <em>before</em> you need to change that format.</p>
+<aside class="callout c-autopsy"><h4>The retry storm</h4><div class="callout-body"><p>An intermittent 429 from a downstream API. The client retried three times with no jitter. Two hundred concurrent agents hit the limit within the same second, all retried at t+1s, all failed, all retried at t+2s.</p>
+<p>Sustained load rose to roughly six times baseline for eleven minutes. Every retry re-sent a full transcript — averaging 40,000 tokens — so the bill for that window ran to four figures with a 0% success rate. The dashboard showed nothing unusual until the invoice, because the agents were "working": no errors surfaced to users, just slow tasks that eventually gave up.</p>
+<p>Fixed with jittered exponential backoff, a circuit breaker on the downstream service, and a per-session budget guard that aborts rather than retries into a wall. The alert that would have caught it in minutes is cost per task, p95 — the first metric in M10's list.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 12a — Cut the bill by 60%</h4><div class="callout-body"><p><code>labs/lab12_cost_chaos</code> — hit a 60% cost reduction on the reference agent while keeping M8 eval accuracy within 3 points. Levers available: caching, model routing, context strategy, tool return shaping, worker count. The tests check cost <em>and</em> accuracy, so buying one with the other fails.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 12b — Chaos</h4><div class="callout-body"><p>Run your M9 system through a fault-injecting proxy: timeouts, 500s, malformed payloads, rate limits, slow responses. Reach 95% task completion. Then survive a simulated mid-task deployment with no lost work.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 12c — Observatory v4</h4><div class="callout-body"><p>Cost attribution by tool, subagent and turn, plus a per-tenant budget dashboard. The gate requires it to be accurate to within 5% of the billed usage — which is where you discover which costs you were not counting.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">Prompt caching</a></li><li><a href="https://docs.anthropic.com/en/docs/build-with-claude/batch-processing">Message Batches API</a></li><li><a href="https://www.anthropic.com/pricing">Pricing</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Cost target met within accuracy tolerance; chaos suite passes; dashboard accurate to within 5% of billed usage.</p>
+<p style="margin-top:9px"><code>pytest labs/lab12_cost_chaos -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab12_cost_chaos" style="margin-right:8px">lab12_cost_chaos &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M12">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m11.html"><span class="dir">&#8592; previous</span><span class="t">M11 &middot; Security: agents that can&#x27;t be turned against you</span></a><a class="next" href="m13.html"><span class="dir">next &#8594;</span><span class="t">M13 &middot; Human-in-the-loop and interface design</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m12", "questions": [{"q": "A task takes 20 turns instead of 10, with everything else unchanged. Roughly what happens to input token cost?", "options": ["It doubles", "It roughly quadruples", "It stays the same due to caching", "It increases by the tool definition surcharge only"], "answer": 1, "why": "Each turn re-sends the whole transcript, so history tokens accumulate as n(n\u22121)/2 \u2014 quadratic in turn count. This is why halving turn count beats almost any other optimisation, including switching to a cheaper model."}, {"q": "Which change to a working agent will silently double its bill?", "options": ["Adding a tool at startup", "Putting the current timestamp in the system prompt", "Increasing max_tokens", "Enabling streaming"], "answer": 1, "why": "Caching is a prefix match. A timestamp in the system prompt changes the prefix on every request, so nothing ever caches \u2014 with no error, no warning and no behavioural change. Only <code>usage.cache_read_input_tokens</code> and your invoice can tell you."}, {"q": "You want to reduce p95 latency for an agent whose median task is 8 turns and whose p95 is 25 turns. What helps most?", "options": ["A model with faster per-token output", "Reducing turn count \u2014 consolidating tools, executing independent calls in parallel, and capping thrashing runs", "Streaming the response", "Increasing max_tokens so fewer turns are truncated"], "answer": 1, "why": "The tail is made of runs that took many more turns than the median, so per-turn speed barely moves it. Streaming improves perceived latency, which is worth doing, but it does not change the number. The p99 run at 40 turns is usually thrashing rather than working."}, {"q": "Why is jitter the essential ingredient in retry backoff?", "options": ["It reduces the total number of retries", "Without it, all clients retry in lockstep and re-create the original load spike", "It makes retries idempotent", "It resets the circuit breaker"], "answer": 1, "why": "Exponential backoff without jitter just moves every client's retry to the same later instant. Two hundred agents that failed together retry together, fail together, and sustain the outage. Full jitter spreads them out \u2014 and it pairs with a circuit breaker and a budget guard, which bound the damage the retries can do."}, {"q": "Why do agents need rainbow deployments where a stateless web service does not?", "options": ["Agents use more memory per instance", "Killing an instance kills in-flight multi-turn tasks partway through, losing the work and the money already spent", "Agent binaries are larger and take longer to roll out", "Because model versions must match across instances"], "answer": 1, "why": "A rolling deploy is invisible for stateless request handling and is a mass-cancellation event for a fleet of agents mid-task. Rainbow deployments route new tasks to the new version while letting existing tasks finish where they started \u2014 which requires both versions to tolerate the same session format."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

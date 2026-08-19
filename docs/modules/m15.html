@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M15 &middot; Applied patterns: eight domains, eight architectures — Building AI Agents</title>
+<meta name="description" content="The patterns are the same. The failure modes are not.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 4 &middot; M15</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M15</span><span class="pill">3.0 h</span><span class="pill">phase 4 &middot; Applied</span></div>
+  <h1>Applied patterns: eight domains, eight architectures</h1>
+  <p class="line">The patterns are the same. The failure modes are not.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-patterns-are-the-same">The patterns are the same</a></li><li><a href="#software-engineering">Software engineering</a></li><li><a href="#research-and-analysis">Research and analysis</a></li><li><a href="#data-and-business-intelligence">Data and business intelligence</a></li><li><a href="#customer-operations">Customer operations</a></li><li><a href="#document-processing">Document processing</a></li><li><a href="#devops-and-sre">DevOps and SRE</a></li><li><a href="#sales-and-crm">Sales and CRM</a></li><li><a href="#personal-and-internal-automation">Personal and internal automation</a></li><li><a href="#deployment-shape">Deployment shape</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Recognise the same handful of patterns recurring across eight very different domains</li><li>Name the specific failure each domain punishes you for</li><li>Pick a reference architecture as a starting point and know what to change</li><li>Choose a deployment shape against compliance, latency and control constraints</li><li>Distinguish pattern literacy from domain literacy, and know which one you lack</li></ul></div>
+<h2 id="the-patterns-are-the-same">The patterns are the same</h2>
+<p>By now you have the whole vocabulary: workflows and agents, tool design, context strategy, memory, evaluation, multi-agent, observability, security, cost. Eight domains follow, and the striking thing is how little the architecture varies.</p>
+<p>What varies enormously is <strong>what kills you</strong>. Every domain punishes a different mistake, and the mistake is usually not the one your instincts are guarding against.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>The patterns are the same. The failure modes are not.</p></div></aside>
+<h2 id="software-engineering">Software engineering</h2>
+<p><strong>Architecture:</strong> autonomous agent · file and shell tools · checkpointing · test-gated loop.</p>
+<p>The canonical agentic domain: the path genuinely cannot be enumerated, feedback is immediate and machine-readable, and errors are cheap in a branch.</p>
+<p><strong>What bites you: verification.</strong> "It compiles" is not "it works", and an agent optimising for a green build will produce a green build. Without a test gate you get plausible code that passes review and fails in production.</p>
+<p><strong>Do:</strong> make tests the loop's success criterion, not a step in it. Check out to an isolated worktree. Checkpoint per turn — long tasks and crashes are routine. Never let the agent modify the tests it is being graded by, which it will do, sincerely, given the chance.</p>
+<h2 id="research-and-analysis">Research and analysis</h2>
+<p><strong>Architecture:</strong> orchestrator-workers · wide parallel search · synthesis with citations.</p>
+<p>The domain where multi-agent genuinely pays (M9): parallelisable, read-heavy, and valuable enough to absorb the multiple.</p>
+<p><strong>What bites you: source quality.</strong> Agents drift toward SEO content farms, because they are optimised to be extractable — clean structure, quotable sentences, confident phrasing. The output looks excellent and is sourced from nothing.</p>
+<p><strong>Do:</strong> put source quality in the rubric explicitly (M8). Give explicit heuristics — prefer primary sources, prefer the filing over the article about the filing. Require a citation per claim and assert it in evals. Surface conflicts rather than averaging them.</p>
+<h2 id="data-and-business-intelligence">Data and business intelligence</h2>
+<p><strong>Architecture:</strong> routing plus SQL tools · read-only credentials · validation before execution.</p>
+<p><strong>What bites you: schema hallucination and silent wrong answers.</strong> A query against a misremembered column name errors, which is fine. A query with subtly wrong join semantics returns a plausible number, which is not. Nobody checks a number that looks reasonable.</p>
+<p><strong>Do:</strong> read-only credentials, always. Provide the schema as a resource rather than hoping it is remembered. Validate queries before execution. Add sanity checks — row counts, totals against known aggregates, order-of-magnitude assertions. Show the query alongside the answer, every time: it is the only way a human can catch this class.</p>
+<figure class="code" data-lang="python"><div class="code-title">domains/bi/sanity.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def run_query(sql: str, expectations: dict) -&gt; dict:
+    &quot;&quot;&quot;Execute a read-only query and refuse to return a silently wrong answer.&quot;&quot;&quot;
+    reject_if_not_select(sql)                 # parsed, not regexed
+    rows = readonly_conn.execute(sql).fetchall()
+
+    warnings = []
+    if expectations.get(&quot;min_rows&quot;) and len(rows) &lt; expectations[&quot;min_rows&quot;]:
+        warnings.append(
+            f&quot;returned {len(rows)} rows, expected at least &quot;
+            f&quot;{expectations[&#x27;min_rows&#x27;]} — check the join&quot;
+        )
+    if (total := expectations.get(&quot;total_within&quot;)) and rows:
+        actual = sum(r[expectations[&quot;total_column&quot;]] for r in rows)
+        if not (total[&quot;low&quot;] &lt;= actual &lt;= total[&quot;high&quot;]):
+            warnings.append(
+                f&quot;total {actual:,.0f} is outside the expected range &quot;
+                f&quot;{total[&#x27;low&#x27;]:,.0f}-{total[&#x27;high&#x27;]:,.0f}&quot;
+            )
+
+    # The query goes back with the answer, always. A number without its query
+    # is a number nobody can check.
+    return {&quot;sql&quot;: sql, &quot;rows&quot;: rows, &quot;warnings&quot;: warnings}</code></pre></figure>
+<h2 id="customer-operations">Customer operations</h2>
+<p><strong>Architecture:</strong> routing workflow with an escalation ladder · policy retrieval · tight scope.</p>
+<p>Rarely a full agent. Routing plus specialised handlers is faster, cheaper and far more predictable at volume.</p>
+<p><strong>What bites you: confident wrongness at scale.</strong> One wrong answer is a ticket; the same wrong answer delivered five thousand times before anyone notices is a regulatory problem.</p>
+<p><strong>Do:</strong> scope tightly and escalate aggressively — the correct action is often "hand to a human". Require a citation to a specific policy document for anything consequential. Monitor for distribution shift in the answers themselves, not just in volume. Make abstention a rewarded outcome in your evals (M8), or you will optimise it away.</p>
+<h2 id="document-processing">Document processing</h2>
+<p><strong>Architecture:</strong> prompt chaining plus evaluator-optimiser · per-field confidence · human review queue.</p>
+<p><strong>What bites you: the long tail and silent truncation.</strong> 95% of documents match the format you tested. The remaining 5% is unbounded — scans, rotated pages, tables spanning page breaks, handwriting — and the failure is a confidently extracted wrong value, not an error.</p>
+<p><strong>Do:</strong> per-field confidence, and route low-confidence fields to human review rather than guessing. Never truncate silently (M2). Sample the tail deliberately when building the eval set; the tail is where your accuracy actually lives.</p>
+<h2 id="devops-and-sre">DevOps and SRE</h2>
+<p><strong>Architecture:</strong> narrow, high-privilege tools · dry-run first · approval on mutations · exhaustive audit.</p>
+<p><strong>What bites you: blast radius.</strong> These agents hold the most dangerous tools in any domain, and the lethal trifecta (M11) lives here by default: private data (infrastructure state, secrets), untrusted content (logs, alerts, tickets, third-party status pages), and egress (the ability to change production).</p>
+<p><strong>Do:</strong> dry-run everything by default; <code>apply</code> is a separate, gated mode. Approval on every mutation (M13) — this is the domain where rung 2 is correct. Audit everything durably. Narrow the tools: <code>restart_service(name)</code> not <code>bash</code>. And write the threat model down, because this is the domain where someone will eventually inject a log line on purpose.</p>
+<h2 id="sales-and-crm">Sales and CRM</h2>
+<p><strong>Architecture:</strong> MCP-heavy integration · memory for account context · write validation.</p>
+<p><strong>What bites you: data hygiene and PII.</strong> An agent with write access to a CRM can degrade it faster than a team can repair it — duplicates, malformed fields, overwritten human notes. Meanwhile customer records are exactly the private data leg of the trifecta.</p>
+<p><strong>Do:</strong> validate every write against the schema and against existing records. Deduplicate before creating. Never overwrite a human-authored field — append. Run a redaction hook on every result (M5), because CRM data will otherwise end up in your traces, logs and evals.</p>
+<h2 id="personal-and-internal-automation">Personal and internal automation</h2>
+<p><strong>Architecture:</strong> scheduled agents · narrow scope · self-reporting.</p>
+<p>The domain that looks easiest and has the worst failure mode.</p>
+<p><strong>What bites you: unattended failure nobody notices.</strong> A nightly agent breaks in week one and "succeeds" silently for three weeks. Nobody is watching, because the entire point was not to have to watch.</p>
+<p><strong>Do:</strong> alerting and self-reporting <em>are</em> the design, not additions to it. Report every run, including successful ones, so silence is itself an alarm. Assert on outputs, not just exit codes. Set a dead-man's switch: no run in 26 hours pages someone. And put a hard budget cap on it, because an unattended agent in a retry loop is unattended for a long time.</p>
+<figure class="code" data-lang="python"><div class="code-title">domains/scheduled/run.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def nightly():
+    &quot;&quot;&quot;Report every outcome. Silence must be the only thing that is impossible.&quot;&quot;&quot;
+    started = time.time()
+    try:
+        result = agent.run(TASK, budget=Budget(max_usd=2.00))
+        # Exit code 0 is not success. Assert on the artifact.
+        assert result.rows_written &gt; 0, &quot;produced no rows&quot;
+        assert result.freshness_hours &lt; 24, &quot;source data was stale&quot;
+        report(&quot;ok&quot;, rows=result.rows_written, usd=result.usd,
+               seconds=time.time() - started)
+    except BudgetExceeded as exc:
+        report(&quot;budget&quot;, detail=str(exc))          # distinct from a crash
+        raise
+    except Exception as exc:
+        report(&quot;failed&quot;, detail=repr(exc))
+        raise
+    finally:
+        heartbeat.touch()      # a dead-man&#x27;s switch pages if this stops happening</code></pre></figure>
+<h2 id="deployment-shape">Deployment shape</h2>
+<p>Two broad shapes, and the choice is usually made by constraints rather than preference.</p>
+<div class="table-wrap"><table><thead><tr><th></th><th>Self-hosted harness</th><th>Managed Agents</th></tr></thead><tbody><tr><td>You operate</td><td>Everything</td><td>The client</td></tr><tr><td>Control</td><td>Total</td><td>Configuration surface</td></tr><tr><td>Compliance</td><td>Data stays where you put it</td><td>Governed by the provider's terms</td></tr><tr><td>Long-running</td><td>You build resumption, scheduling</td><td>Sessions, scheduled deployments</td></tr><tr><td>Sandbox</td><td>You build and harden it (M11)</td><td>Hosted per-session container</td></tr><tr><td>Best when</td><td>Strict data residency, custom runtime, existing infra</td><td>You want the loop and the sandbox operated for you</td></tr></tbody></table></div>
+<p>The compliance question usually decides it. The latency question rarely does; the control question is often overstated until the first time you need to change something the configuration surface does not expose.</p>
+<aside class="callout c-autopsy"><h4>Same architecture, four domains, four different deaths</h4><div class="callout-body"><p>The same orchestrator-workers system, adapted four times.</p>
+<p>In <strong>research</strong>, it died on source quality — beautifully synthesised, sourced from content farms. In <strong>BI</strong>, it died on a join: a plausible number, wrong, acted on for a month. In <strong>document processing</strong>, it died on the 5% tail — the eval set was built from the documents that were easy to collect, which were the ones that parsed. In <strong>DevOps</strong>, it died on blast radius: a dry-run flag that defaulted to false.</p>
+<p>Four teams, four architectures they could each defend, four failures none of them was watching for. Pattern literacy told them how to build it. Only domain literacy told them what to fear — and that comes from the failure catalogue of the domain, not from the architecture diagram.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 15 — Pick two</h4><div class="callout-body"><p><code>labs/lab15_domains</code> ships all eight as runnable reference implementations at reduced scope. Pick two — ideally one close to your capstone and one far from it — and implement them properly.</p>
+<p>For each, write the one-page architecture brief in capstone format: problem, autonomy choice with the M4 framework applied, tools, context strategy, evaluation approach, threat model, cost estimate.</p>
+<p>The gate: both pass their smoke tests, and both briefs are complete. Read the other six.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents</a></li><li><a href="https://docs.anthropic.com/en/docs/agents-and-tools/managed-agents">Managed Agents</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Two mini-implementations pass smoke tests; a one-page architecture brief for each, in capstone format.</p>
+<p style="margin-top:9px"><code>pytest labs/lab15_domains -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab15_domains" style="margin-right:8px">lab15_domains &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M15">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m14.html"><span class="dir">&#8592; previous</span><span class="t">M14 &middot; Skills, plugins and packaging capability</span></a><a class="next" href="m16.html"><span class="dir">next &#8594;</span><span class="t">M16 &middot; Capstone: ship one real thing and defend it</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m15", "questions": [{"q": "A coding agent produces code that compiles and passes review, then fails in production. Which domain-specific control was missing?", "options": ["A larger context window", "A test gate as the loop's success criterion, with the agent unable to modify those tests", "Approval on every file write", "A multi-agent architecture"], "answer": 1, "why": "Software engineering punishes weak verification: \"it compiles\" is not \"it works\", and an agent optimising for a green build produces a green build. The tests must be the loop's success criterion rather than a step in it \u2014 and must be out of the agent's reach, because it will otherwise edit them, sincerely."}, {"q": "Which failure is characteristic of BI and analytics agents?", "options": ["The agent refuses to answer", "A query with subtly wrong join semantics returns a plausible number that nobody checks", "The context window overflows on large result sets", "SQL injection from user input"], "answer": 1, "why": "A misremembered column name errors, which is safe. Wrong join semantics returns a reasonable-looking number, and reasonable-looking numbers do not get checked. Hence read-only credentials, schema as a resource, sanity checks against known aggregates, and showing the query alongside the answer every time."}, {"q": "Why is DevOps/SRE the domain where the lethal trifecta most often appears by default?", "options": ["Because DevOps agents use more tools than other domains", "Because infrastructure state and secrets are private data, logs and alerts are untrusted content, and changing production is egress", "Because DevOps teams have weaker security review", "Because these agents usually run unattended"], "answer": 1, "why": "All three legs are present in the ordinary design, not as a mistake. Logs, alerts, tickets and third-party status pages are attacker-influenceable content, and the agent that reads them also holds credentials and the ability to change production."}, {"q": "A nightly internal automation breaks in week one and nobody notices for three weeks. What is the design lesson?", "options": ["Run it more frequently so failures surface sooner", "Alerting and self-reporting are the design, not additions to it \u2014 report every run so silence is itself an alarm", "Add a human approval step to each run", "Use a more capable model"], "answer": 1, "why": "The whole point of an unattended agent is that nobody watches it, so failure detection cannot depend on someone watching. Report successes as well as failures, assert on outputs rather than exit codes, add a dead-man's switch, and cap the budget \u2014 an agent in a retry loop is unattended for a long time."}, {"q": "Document processing works on 95% of your test set and fails in production. What most likely went wrong?", "options": ["The model version changed", "The eval set was built from documents that were easy to collect \u2014 which were the ones that parse \u2014 so the unbounded tail was never sampled", "The context window was too small", "Confidence scores were miscalibrated"], "answer": 1, "why": "The tail is where document accuracy actually lives: scans, rotated pages, tables spanning page breaks. It is also the part hardest to collect, so it silently drops out of eval sets. Sample it deliberately, use per-field confidence, and route low-confidence fields to human review rather than guessing."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M13 &middot; Human-in-the-loop and interface design — Building AI Agents</title>
+<meta name="description" content="The hard question isn&#x27;t “can the agent do it” but “when should it ask, and how does a human know whether to say yes.”">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 3 &middot; M13</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M13</span><span class="pill">2.5 h</span><span class="pill">phase 3 &middot; Production</span></div>
+  <h1>Human-in-the-loop and interface design</h1>
+  <p class="line">The hard question isn't “can the agent do it” but “when should it ask, and how does a human know whether to say yes.”</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-question-is-not-can-it">The question is not &quot;can it&quot;</a></li><li><a href="#the-autonomy-ladder">The autonomy ladder</a></li><li><a href="#what-a-human-needs-to-decide">What a human needs to decide</a></li><li><a href="#approval-fatigue-is-a-security-failure-mode">Approval fatigue is a security failure mode</a></li><li><a href="#steering-and-interruption">Steering and interruption</a></li><li><a href="#streaming-ux-for-unknown-step-counts">Streaming UX for unknown step counts</a></li><li><a href="#trust-calibration">Trust calibration</a></li><li><a href="#undo-dry-run-and-preview-as-primitives">Undo, dry-run and preview as primitives</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Place each action class on an autonomy ladder rather than rating the agent as a whole</li><li>Design an approval prompt a human can actually decide from</li><li>Treat approval fatigue as a security failure mode and engineer against it</li><li>Support steering and interruption without restarting the task</li><li>Build honest progress UX for work with an unknown number of steps</li><li>Calibrate trust in both directions, using legibility as the instrument</li></ul></div>
+<h2 id="the-question-is-not-can-it">The question is not "can it"</h2>
+<p>By this point in the course you can build an agent that does the task. The remaining questions are harder and they are product questions:</p>
+<p><strong>When should it ask?</strong> And when it asks, <strong>how does a human know whether to say yes?</strong></p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>The hard question isn't “can the agent do it” but “when should it ask, and how does a human know whether to say yes.”</p></div></aside>
+<h2 id="the-autonomy-ladder">The autonomy ladder</h2>
+<p>Six rungs, from least to most autonomous:</p>
+<ol><li><strong>Suggest</strong> — the agent proposes, a human performs the action.</li><li><strong>Approve each</strong> — the agent proposes each action and waits.</li><li><strong>Approve risky</strong> — routine actions proceed; a defined risky class waits.</li><li><strong>Act and notify</strong> — the agent acts, the human is told afterwards.</li><li><strong>Act with undo</strong> — the agent acts, the human can reverse it.</li><li><strong>Autonomous</strong> — the agent acts; no notification, no undo.</li></ol>
+<p>The mistake everyone makes first is choosing a rung <strong>for the agent</strong>. It is chosen <strong>per action class</strong>, and a single agent will span four rungs at once.</p>
+<p>The same coding agent should read files autonomously (rung 6 — approving reads is how you train people to click yes without looking), commit to a feature branch with undo (rung 5 — git makes undo cheap and real), and wait for approval before force-pushing to main (rung 2). Rating "this agent" as "semi-autonomous" is a category error that produces both over-gating and under-gating simultaneously.</p>
+<p>Two properties place an action on the ladder: <strong>reversibility</strong> and <strong>blast radius</strong>. Cheaply reversible and self-contained goes high. Irreversible or wide goes low.</p>
+<div class="widget" data-widget="autonomy-ladder" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<h2 id="what-a-human-needs-to-decide">What a human needs to decide</h2>
+<p>Here is a real approval prompt, and it is a rubber-stamp generator:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">Agent wants to run: bash
+[Approve] [Deny]</code></pre></figure>
+<p>A person shown that a hundred times a day learns exactly one behaviour, and it is not careful review.</p>
+<p>Four fields make a decision possible:</p>
+<p><strong>The action, concretely.</strong> Not "bash" — <code>rm -rf ./build/cache</code> in <code>/srv/app</code>, affecting 340 files.</p>
+<p><strong>The reason.</strong> What the agent believes this accomplishes. "Clearing the stale build cache so the next compile picks up the dependency change."</p>
+<p><strong>The blast radius.</strong> What changes, for whom, and whether it is reversible. "Deletes generated files only; no source. Regenerated by the next build."</p>
+<p><strong>The alternative.</strong> What happens if you decline. "I'll skip the clean and try an incremental build, which may reproduce the error."</p>
+<p>That fourth field is the one that is almost always missing, and it is the one that makes approval a choice rather than a gate. Without it the human has no way to weigh anything — they can only guess at the cost of saying no.</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">┌─────────────────────────────────────────────────────────────┐
+│ Approve: delete 340 files                                   │
+│                                                             │
+│ ACTION      rm -rf ./build/cache   (in /srv/app)            │
+│ WHY         Stale cache is shadowing the dependency bump    │
+│ IMPACT      Generated files only. No source. Reversible —   │
+│             regenerated by the next build (~40s).           │
+│ IF DENIED   Falls back to an incremental build, which may   │
+│             reproduce the original error.                   │
+│                                                             │
+│ [Approve]  [Approve all cache operations]  [Deny]  [Edit]   │
+└─────────────────────────────────────────────────────────────┘</code></pre></figure>
+<h2 id="approval-fatigue-is-a-security-failure-mode">Approval fatigue is a security failure mode</h2>
+<p>State it plainly, because it is usually treated as a UX annoyance: <strong>a human who approves forty prompts a day is not reviewing anything.</strong> You have built a security control whose reliability degrades with usage, and you have done it in a way that looks responsible on an architecture diagram.</p>
+<p>The countermeasures:</p>
+<p><strong>Risk tiering.</strong> Only genuinely risky actions interrupt. If everything asks, nothing is reviewed.</p>
+<p><strong>Batching.</strong> "The agent will modify these 12 files: [list]. Approve all?" One considered decision beats twelve reflexes.</p>
+<p><strong>Learned allow-lists.</strong> "You have approved <code>npm test</code> 23 times. Always allow?" — the honest response to a pattern the human has already established.</p>
+<p><strong>Scoped approvals.</strong> "Approve cache operations for this session" bounds the grant in time and kind rather than forever and everywhere.</p>
+<p><strong>Measure it.</strong> Track approvals per user per day, and time-to-decision. When median decision time drops below about two seconds, your control has become a formality and you should know that.</p>
+<h2 id="steering-and-interruption">Steering and interruption</h2>
+<p>Watching an agent go the wrong way with no way to intervene except killing it is a terrible experience, and it wastes everything done so far.</p>
+<p><strong>Interrupt</strong> should pause cleanly at the next turn boundary, preserving state.</p>
+<p><strong>Steer</strong> should let a human inject a correction that the agent incorporates and continues from — "no, use the staging database" — without discarding twelve turns of context.</p>
+<p><strong>Rewind</strong> should let a human return to turn 8 and take a different path, which is session forking (M5) with a user interface on it.</p>
+<p>Design steering as an operator channel rather than an ordinary user message. On supporting models, appending a <code>{&quot;role&quot;: &quot;system&quot;}</code> message mid-conversation is exactly this: it carries operator authority, is not confusable with the untrusted user turn, and preserves the cached prefix.</p>
+<h2 id="streaming-ux-for-unknown-step-counts">Streaming UX for unknown step counts</h2>
+<p>Agents violate the two progress-bar assumptions: they do not know how many steps remain, and the steps are not equal.</p>
+<p>What actually works:</p>
+<p><strong>Show the work, not a percentage.</strong> A live feed of what the agent is doing — "searching the ledger export", "reading contract.pdf (page 4 of 12)" — is more informative and more honest than a fabricated bar.</p>
+<p><strong>Make tool calls visible.</strong> Users trust an agent whose actions they can see, and they catch mistakes earlier. This is legibility doing security work.</p>
+<p><strong>Stream the reasoning where it helps.</strong> Summarised thinking makes long pauses legible. Note that on current models thinking display defaults to omitted, so a streaming UI shows a long silence unless you explicitly ask for the summary.</p>
+<p><strong>Be honest about the unknown.</strong> "Step 4 — about 3 more expected" beats a bar that sits at 80% for four minutes. If you cannot estimate, say so.</p>
+<p><strong>Show cost as it accrues</strong> when the user is paying. It is information they need in order to interrupt, and it does more for trust calibration than any amount of reassurance.</p>
+<h2 id="trust-calibration">Trust calibration</h2>
+<p>Both directions are product failures.</p>
+<p><strong>Over-trust</strong> — the user accepts output without review, and errors flow through unchecked. Caused by uniformly confident presentation and by an early run of successes.</p>
+<p><strong>Under-trust</strong> — the user verifies everything, and the agent saves nobody any time. Caused by an early visible failure with no explanation, and by opaque behaviour.</p>
+<p>The cure for both is the same: <strong>legibility</strong>. An agent that shows its work, cites its sources, expresses calibrated confidence, and says clearly when it is unsure lets a user learn <em>when</em> to trust it rather than <em>whether</em> to. Uniform confidence destroys that signal in both directions.</p>
+<h2 id="undo-dry-run-and-preview-as-primitives">Undo, dry-run and preview as primitives</h2>
+<p>Design them in from the start; they are extremely hard to retrofit.</p>
+<p><strong>Dry-run</strong> — every mutating tool takes a mode parameter and can report what it <em>would</em> do. This is also your best debugging tool and your best demo.</p>
+<p><strong>Preview</strong> — show the diff before applying it. A file diff, a list of records to be changed, the draft email.</p>
+<p><strong>Undo</strong> — a compensating action for every mutating action, wherever possible. Where it is not possible, that fact should appear in the approval prompt as "this cannot be undone", because that is precisely the information the human needs.</p>
+<p><strong>Checkpoint and rewind</strong> — the whole session, not just individual actions. This is M5's session forking exposed to the user.</p>
+<p>A useful reframing: <strong>turning an irreversible action into a reversible one is often cheaper than gating it.</strong> A soft delete with a 30-day retention window converts a rung-2 action into a rung-5 action, removes an approval from the human's day, and is usually a few hours of work.</p>
+<aside class="callout c-autopsy"><h4>The approve-all button</h4><div class="callout-body"><p>A product shipped per-action approval and users complained, so the team added "approve all for this session". Adoption was immediate and near-universal — clicked, on average, within the first ninety seconds of a session.</p>
+<p>The product was now a fully autonomous agent, with an audit trail showing informed consent for every action. The approval flow had not been removed; it had been rendered ceremonial, and the ceremony made the risk <em>harder</em> to see rather than easier, because the logs looked impeccable.</p>
+<p>What worked instead: risk tiering so only genuinely risky actions asked, batching for the rest, and scoped grants ("cache operations, this session") instead of unbounded ones. Approvals per session fell by roughly 80% and the remaining ones got read — median decision time went from 1.2 seconds to 9.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 13 — Ship a front end</h4><div class="callout-body"><p><code>labs/lab13_hitl</code> — a web UI for your M9 agent with streaming output, a live tool-call display, an approval flow for one genuinely dangerous action, mid-task steering, and citation-linked results.</p>
+<p>Then five usability tests with classmates. Record where trust broke — where they hesitated, where they clicked without reading, where they did not believe a correct answer — and iterate once.</p>
+<p>The gate is the functional checklist plus a usability rubric scored by three peers, and a written summary of what testing changed. If testing changed nothing, you did not test.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://www.microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction/">Design principles for human-AI interaction</a></li><li><a href="https://code.claude.com/docs/en/agent-sdk">Claude Agent SDK: permissions</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Functional checklist plus a usability rubric scored by three peers, and a written summary of what testing changed.</p>
+<p style="margin-top:9px"><code>pytest labs/lab13_hitl -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab13_hitl" style="margin-right:8px">lab13_hitl &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M13">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m12.html"><span class="dir">&#8592; previous</span><span class="t">M12 &middot; Cost, latency and reliability engineering</span></a><a class="next" href="m14.html"><span class="dir">next &#8594;</span><span class="t">M14 &middot; Skills, plugins and packaging capability</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m13", "questions": [{"q": "At which level should a rung on the autonomy ladder be chosen?", "options": ["Per agent, based on how capable it is", "Per action class, based on reversibility and blast radius", "Per user, based on their seniority", "Per session, based on the task's value"], "answer": 1, "why": "One agent spans several rungs at once: reading files autonomously, committing to a branch with undo, and waiting for approval before force-pushing to main. Rating \"the agent\" as semi-autonomous produces over-gating and under-gating simultaneously."}, {"q": "Which field is most often missing from approval prompts, and why does it matter most?", "options": ["The action \u2014 users cannot see what will run", "The alternative \u2014 without knowing the cost of declining, the human can only guess, so it is a gate rather than a choice", "The timestamp", "The agent's confidence score"], "answer": 1, "why": "Action, reason and blast radius are commonly present in some form. \"What happens if I say no\" is almost always absent \u2014 and without it a human has no way to weigh the decision, so approval degrades into assent."}, {"q": "Why is approval fatigue described as a security failure mode rather than a UX problem?", "options": ["Because tired users make more typos", "Because a control whose reliability degrades with usage stops being a control while continuing to look like one on the architecture diagram", "Because approval prompts can be spoofed", "Because it slows the agent down"], "answer": 1, "why": "Forty prompts a day trains reflexive approval. The control is still drawn on the diagram and still produces an audit trail, which makes the risk harder to see, not easier. Track approvals per day and median decision time \u2014 under about two seconds, the control is ceremonial."}, {"q": "An agent must delete production records. Which is usually the best engineering move?", "options": ["Add an approval gate at rung 2", "Convert the action to a soft delete with a retention window, turning an irreversible action into a reversible one", "Restrict the tool to senior users", "Log the deletion thoroughly"], "answer": 1, "why": "Gating, restricting and logging all manage an irreversible action. Making it reversible removes the problem: a soft delete with 30-day retention moves it from rung 2 to rung 5, removes an approval from someone's day, and usually costs a few hours of work."}, {"q": "Both over-trust and under-trust are product failures. What addresses both?", "options": ["Higher accuracy", "Legibility \u2014 showing work, citing sources, and expressing calibrated rather than uniform confidence", "More approval gates", "A confidence percentage on every response"], "answer": 1, "why": "Accuracy alone does not tell a user <em>when</em> to trust. Uniform confidence \u2014 including a percentage attached to everything \u2014 destroys the signal in both directions. Showing the work and being clearly unsure when unsure lets users calibrate per case, which is the only kind of trust that is useful."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

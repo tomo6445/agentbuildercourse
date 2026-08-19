@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M2 &middot; Tools: designing the agent&#x27;s hands — Building AI Agents</title>
+<meta name="description" content="Agent-tool interfaces are as critical as human-computer interfaces, and get a fraction of the care.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 0 &middot; M2</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M2</span><span class="pill core">core path</span><span class="pill">3.0 h</span><span class="pill">phase 0 &middot; Mechanics</span></div>
+  <h1>Tools: designing the agent&#x27;s hands</h1>
+  <p class="line">Agent-tool interfaces are as critical as human-computer interfaces, and get a fraction of the care.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-interface-nobody-designs">The interface nobody designs</a></li><li><a href="#anatomy-of-a-tool-definition">Anatomy of a tool definition</a></li><li><a href="#the-hidden-tax">The hidden tax</a></li><li><a href="#consolidation-beats-coverage">Consolidation beats coverage</a></li><li><a href="#namespacing-and-the-thirty-tool-wall">Namespacing and the thirty-tool wall</a></li><li><a href="#poka-yoke-making-the-wrong-call-hard">Poka-yoke: making the wrong call hard</a></li><li><a href="#returns-and-errors-are-prompts-too">Returns and errors are prompts too</a></li><li><a href="#working-with-claude-on-your-tool-layer">Working with Claude on your tool layer</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Write a tool description that reads as a prompt, because it is one</li><li>Choose between tool_choice modes and know what each costs in behaviour and tokens</li><li>Consolidate a sprawling CRUD surface into tools shaped like tasks</li><li>Design parameters that make the wrong call structurally difficult</li><li>Write errors and returns that let a model recover without your help</li><li>Diagnose a failing agent by fixing the tool layer and nothing else</li></ul></div>
+<h2 id="the-interface-nobody-designs">The interface nobody designs</h2>
+<p>We spend careers on human-computer interfaces — affordances, error messages, undo, progressive disclosure. Then we expose a language model to eight functions named <code>get_data</code>, <code>do_thing</code> and <code>process</code>, with no parameter descriptions, and conclude from the resulting mess that the model is bad at our domain.</p>
+<p>An agent-tool interface is a user interface. Its user reads only text, has no memory of your codebase, cannot ask a colleague, and must decide from the description alone whether this is the right tool for what it is trying to do. It deserves the same care as a human interface and typically gets a fraction of it.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Agent-tool interfaces are as critical as human-computer interfaces, and get a fraction of the care.</p></div></aside>
+<h2 id="anatomy-of-a-tool-definition">Anatomy of a tool definition</h2>
+<p>Three fields. The third is a schema; the second is a prompt.</p>
+<figure class="code" data-lang="python"><div class="code-title">tools/crm.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">CRM_SEARCH = {
+    &quot;name&quot;: &quot;crm_search_customers&quot;,
+    &quot;description&quot;: (
+        &quot;Search the CRM for customers by name, email address or account number. &quot;
+        &quot;Use this whenever you need a customer&#x27;s internal ID before calling any &quot;
+        &quot;other crm_* tool — no other tool accepts a name. &quot;
+        &quot;Returns up to 20 matches, each with name, email, account_number, &quot;
+        &quot;customer_id and status. &quot;
+        &quot;Returns an empty list (not an error) when nothing matches: widen the &quot;
+        &quot;query and retry rather than reporting failure to the user.&quot;
+    ),
+    &quot;input_schema&quot;: {
+        &quot;type&quot;: &quot;object&quot;,
+        &quot;properties&quot;: {
+            &quot;query&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;description&quot;: &quot;Free text: a name, email address or account number.&quot;,
+            },
+            &quot;status&quot;: {
+                &quot;type&quot;: &quot;string&quot;,
+                &quot;enum&quot;: [&quot;active&quot;, &quot;churned&quot;, &quot;trial&quot;, &quot;any&quot;],
+                &quot;description&quot;: &quot;Filter by account status. Use &#x27;any&#x27; unless the user narrowed it.&quot;,
+            },
+            &quot;limit&quot;: {
+                &quot;type&quot;: &quot;integer&quot;,
+                &quot;description&quot;: &quot;Maximum results to return, 1-20. Defaults to 10.&quot;,
+            },
+        },
+        &quot;required&quot;: [&quot;query&quot;],
+    },
+}</code></pre></figure>
+<p>Read that description again as though you were the model. It answers four questions, in order:</p>
+<ol><li><strong>What does it do?</strong> Search customers by name, email or account number.</li><li><strong>When should I reach for it?</strong> Whenever you need a customer ID — and it tells you the negative space too: no other tool takes a name, so this one is the entry point.</li><li><strong>What comes back?</strong> Named fields, so the model can plan its next turn instead of guessing.</li><li><strong>What does failure look like?</strong> Empty is not an error. Without that sentence, models routinely report "the customer does not exist" after a single narrow query.</li></ol>
+<p>Most tool descriptions in the wild answer only the first, in six words.</p>
+<div class="widget" data-widget="tool-linter" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<h2 id="the-hidden-tax">The hidden tax</h2>
+<p>Tool definitions are not free and they are not paid once. They occupy context on <strong>every turn</strong> of every conversation, whether the tool is used or not, and enabling tools at all adds a system-prompt surcharge on top.</p>
+<p>Concretely: forty tools averaging 300 tokens each is roughly 12,000 tokens per turn, before the user has typed anything. On a fifteen-turn task that is 180,000 tokens of pure definition — more than most tasks need in total. This is a bill and a context-budget problem at the same time, and it is the single most common way an MCP integration (M6) quietly ruins an agent.</p>
+<p>Three consequences follow:</p>
+<ul><li><strong>Every tool must earn its slot.</strong> "It might be useful someday" is a cost you pay per turn.</li><li><strong>Description length is a real trade-off.</strong> Longer descriptions genuinely improve selection accuracy, up to a point. Pay for the sentences that change behaviour; cut the ones that restate.</li><li><strong>Prompt caching changes the arithmetic, not the principle.</strong> A cached tool block is much cheaper to re-send, but it still occupies attention. Caching fixes the invoice, not the context rot.</li></ul>
+<h2 id="consolidation-beats-coverage">Consolidation beats coverage</h2>
+<p>The instinct from API design is to mirror the backend: one tool per endpoint, CRUD for everything. It produces a tool surface shaped like your database and nothing like the tasks users have.</p>
+<p>Consider a calendar integration exposed as <code>list_events</code>, <code>get_event</code>, <code>create_event</code>, <code>update_event</code>, <code>delete_event</code>, <code>list_attendees</code>, <code>add_attendee</code>, <code>check_availability</code>. To schedule a meeting the model must chain five of them, each round trip adding latency, tokens and a chance to go wrong.</p>
+<p>Replace them with one tool shaped like the actual job:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">SCHEDULE_EVENT = {
+    &quot;name&quot;: &quot;calendar_schedule_event&quot;,
+    &quot;description&quot;: (
+        &quot;Schedule a meeting: finds a slot when all attendees are free, creates the &quot;
+        &quot;event and invites them, in one step. Use this for any request to set up, &quot;
+        &quot;book or arrange a meeting. &quot;
+        &quot;Attendees may be given as names or email addresses — names are resolved &quot;
+        &quot;against the directory automatically. &quot;
+        &quot;Returns the scheduled time, the event link, and the list of attendees who &quot;
+        &quot;could not be invited. &quot;
+        &quot;If no slot exists in the window, returns the three closest alternatives &quot;
+        &quot;rather than an error.&quot;
+    ),
+    ...
+}</code></pre></figure>
+<p>One call instead of five. Fewer turns, less context, fewer failure points, and — critically — the tricky logic (availability intersection, name resolution, fallback slots) lives in <em>your</em> code where it is testable, instead of being improvised by the model across five round trips.</p>
+<p>The rule of thumb: <strong>name tools after tasks, not after tables.</strong> If a tool's name is a verb from your ORM, look again.</p>
+<h2 id="namespacing-and-the-thirty-tool-wall">Namespacing and the thirty-tool wall</h2>
+<p>Prefix by system: <code>crm_search_customers</code>, <code>calendar_schedule_event</code>, <code>github_open_pr</code>. This costs a few tokens and buys three things — no collisions when you add a second integration, an obvious grouping the model can reason about, and the prerequisite for tool search later.</p>
+<p>Somewhere around thirty tools, "add another tool" stops working. Selection accuracy degrades before context does: the model is choosing from a menu too long to hold clearly in mind, and near-duplicates start attracting each other's calls. The fixes, in order of how much they change your architecture:</p>
+<ul><li><strong>Consolidate.</strong> Most large tool sets are a small number of tasks fragmented across many endpoints.</li><li><strong>Split by agent.</strong> Give each sub-agent (M9) only the tools its job needs.</li><li><strong>Tool search.</strong> Mark tools <code>defer_loading: true</code> and add a search tool (<code>tool_search_tool_regex_20251119</code> or the BM25 variant); the model retrieves the definitions it needs. Definitions are appended rather than swapped, so the prompt cache survives. Never defer every tool — the search tool itself and at least one other must stay loaded.</li></ul>
+<h2 id="poka-yoke-making-the-wrong-call-hard">Poka-yoke: making the wrong call hard</h2>
+<p><em>Poka-yoke</em> is the manufacturing practice of designing parts that cannot be assembled wrongly. Apply it to parameters.</p>
+<p><strong>Closed sets become enums.</strong> A <code>status</code> parameter typed as a free string invites <code>&quot;cancelled&quot;</code>, <code>&quot;CHURNED&quot;</code>, <code>&quot;inactive&quot;</code> — three ways to be wrong. As an enum, the wrong value is a schema error you never see rather than a silent empty result.</p>
+<p><strong>Opaque identifiers say where they come from.</strong> <code>&quot;customer_id&quot;</code> with no description gets invented. <code>&quot;The customer_id returned by crm_search_customers&quot;</code> gets looked up.</p>
+<p><strong>Booleans that switch behaviour become named modes.</strong> <code>force=true</code> is a coin flip. <code>mode</code> with <code>[&quot;dry_run&quot;, &quot;apply&quot;]</code> is self-documenting, and the safe value is the one whose name says what it does.</p>
+<p><strong>Structured objects over parallel arrays.</strong> Two arrays that must line up by index will, eventually, not line up.</p>
+<p><strong>Use strict tool use for the ones that matter.</strong> Setting <code>strict: true</code> on a tool definition (with <code>additionalProperties: false</code> and a <code>required</code> list) guarantees the arguments validate against your schema exactly — turning a class of malformed-argument bugs into something the API enforces rather than something your handler discovers.</p>
+<h2 id="returns-and-errors-are-prompts-too">Returns and errors are prompts too</h2>
+<p>Whatever a tool returns becomes context the model reasons from. Shape it deliberately.</p>
+<p><strong>Resolve identifiers to names.</strong> Returning <code>{&quot;owner_id&quot;: &quot;u_8823fa&quot;}</code> forces another round trip or, worse, an invented name. Return <code>{&quot;owner&quot;: &quot;Dana Ruiz&quot;, &quot;owner_id&quot;: &quot;u_8823fa&quot;}</code> and the model can write the sentence immediately.</p>
+<p><strong>Return what is needed, not what is available.</strong> A row with forty columns when the task needs three is thirty-seven columns of attention spent for nothing, on every subsequent turn.</p>
+<p><strong>Paginate with intent.</strong> Say how many results exist, how many were returned, and exactly how to get the next page. "Showing 10 of 47 matches. Call again with <code>page=2</code> for the next 10." — the model now knows both that more exist and precisely what to do about it.</p>
+<p><strong>Never truncate silently.</strong> A tool that quietly cuts a 48,000-token document to 4,000 and returns it unmarked produces confident, false answers with no error anywhere in the trace. If you truncate, say so in the payload: <code>&quot;[truncated: showing 4,000 of 48,000 tokens; call with offset=4000 to continue]&quot;</code>.</p>
+<p><strong>Make errors instructive.</strong> Compare:</p>
+<div class="table-wrap"><table><thead><tr><th>Unhelpful</th><th>Instructive</th></tr></thead><tbody><tr><td><code>Error: invalid input</code></td><td><code>Error: &#x27;status&#x27; must be one of active, churned, trial, any (got &#x27;cancelled&#x27;).</code></td></tr><tr><td><code>Error: not found</code></td><td><code>No customer matches &#x27;j.smith&#x27;. Try a broader query, or search by account number.</code></td></tr><tr><td><code>Error: 500</code></td><td><code>The CRM is unavailable for scheduled maintenance until 14:00 UTC. No lookup will succeed this session — tell the user and stop retrying.</code></td></tr></tbody></table></div>
+<p>That last one is the one people miss. An error that tells the model retrying is futile is the difference between a graceful stop and the error thrash you simulated in M1.</p>
+<aside class="callout c-autopsy"><h4>“The model is bad at this.”</h4><div class="callout-body"><p>Six real cases where a team concluded the model could not handle their domain. In every one, the model was doing exactly what the tool layer told it to. A <code>get_records</code> whose description was "gets records" — selected almost at random against its three neighbours. A date parameter with no format specified — nine different formats emitted across a hundred runs. A search that returned <code>[]</code> on no-match with no explanation — reported to users as "that customer doesn't exist" instead of retried. A <code>limit</code> with no maximum documented — 5,000 rows requested, context blown. In the lab you rewrite each description and watch the failure disappear without touching the agent.</p></div></aside>
+<h2 id="working-with-claude-on-your-tool-layer">Working with Claude on your tool layer</h2>
+<p>Here is a workflow that feels like cheating and is standard practice: give the failing transcripts to Claude and ask it to diagnose the tool layer.</p>
+<p>You have the eval failures, the tool definitions, and the traces. Paste them in and ask which tool descriptions caused which failures, and what the rewrite should say. The model is unusually good at this, for the obvious reason that it is the reader you are writing for. It will flag ambiguities you cannot see because you know what you meant.</p>
+<p>Do this after your own analysis, not instead of it, and treat the output as a proposal to test — the eval set stays the judge.</p>
+<aside class="callout c-lab"><h4>Lab 2 — Tool surgery</h4><div class="callout-body"><p><code>labs/lab02_tool_surgery</code> gives you eight deliberately-flawed CRM tools, a 20-task eval set, and a harness that runs it. One rule: <strong>only the tool layer may change.</strong> The agent loop, the system prompt and the eval set are frozen.</p>
+<p>Baseline is roughly 55% pass rate. Get to 85% or better while <em>reducing</em> total tokens. The tests check both, so you cannot buy accuracy with a thousand-word description.</p>
+<p>Then run <code>python -m lab02_tool_surgery.review</code> to produce the diff summary you will hand to a classmate for the 300-word design review the gate requires.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://www.anthropic.com/engineering/writing-tools-for-agents">Writing effective tools for agents</a></li><li><a href="https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/overview">Tool use overview</a> — schemas, <code>tool_choice</code>, strict tool use, parallel calls</li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>≥85% on a held-out eval set below baseline token cost, plus a 300-word design review of a classmate's tool layer.</p>
+<p style="margin-top:9px"><code>pytest labs/lab02_tool_surgery -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab02_tool_surgery" style="margin-right:8px">lab02_tool_surgery &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M2">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m01.html"><span class="dir">&#8592; previous</span><span class="t">M1 &middot; The Loop: what an agent actually is</span></a><a class="next" href="m03.html"><span class="dir">next &#8594;</span><span class="t">M3 &middot; Context: the finite resource</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m02", "questions": [{"q": "Your agent has 40 tools averaging 300 tokens of definition. A task takes 15 turns. Roughly how many tokens do the definitions alone consume across the task?", "options": ["12,000", "180,000", "4,500", "300"], "answer": 1, "why": "12,000 tokens of definitions are re-sent on every one of the 15 turns \u2014 about 180,000 tokens before any conversation content. Caching reduces what you are billed for this, but the definitions still occupy the context window on every turn."}, {"q": "A <code>status</code> parameter accepts \"active\", \"churned\" or \"trial\". It is currently typed as a plain string. What does adding an <code>enum</code> buy you?", "options": ["Nothing \u2014 the description already lists the values", "It converts a class of silent wrong answers into a schema error you never see", "It reduces the token cost of the definition", "It forces the model to always supply the parameter"], "answer": 1, "why": "Without the enum, a plausible-but-wrong value like \"cancelled\" is accepted by the schema and produces an empty result the model interprets as \"no such customers\". The enum makes the wrong call structurally impossible rather than merely discouraged \u2014 that is poka-yoke."}, {"q": "A tool reads a 48,000-token document and returns the first 4,000 tokens with no marker. What is the characteristic failure?", "options": ["The model errors and the run terminates", "The context window overflows on the next turn", "The model answers confidently about content it never saw, with nothing in the trace looking wrong", "The API rejects the oversized tool result"], "answer": 2, "why": "Silent truncation is dangerous precisely because nothing errors. The model reasons over a partial document and states conclusions \u2014 \"there is no termination clause\" \u2014 with full confidence. Always mark truncation in the payload and say how to get the rest."}, {"q": "You have a calendar integration exposing eight CRUD tools. Scheduling a meeting requires chaining five of them. What is the strongest argument for consolidating into one <code>schedule_event</code> tool?", "options": ["It uses fewer tokens of tool definition", "It moves the tricky logic into your code where it is testable, and removes four chances to go wrong", "CRUD tools are harder for the model to understand individually", "It lets you drop the namespacing prefix"], "answer": 1, "why": "Token savings are real but secondary. The decisive gain is that availability intersection, name resolution and fallback slots become deterministic code you can unit-test, instead of being improvised by the model across five round trips \u2014 each of which adds latency and a failure point."}, {"q": "Which error message is most likely to prevent an agent from burning its whole turn budget?", "options": ["\"Error: 500 internal server error\"", "\"Error: request failed, please try again\"", "\"The CRM is down for maintenance until 14:00 UTC. No lookup will succeed this session.\"", "\"Error: unable to complete operation\""], "answer": 2, "why": "The model has no way to know a failure is permanent unless the error says so. The first, second and fourth all read as transient and invite retries \u2014 the error-thrash pattern from M1. Saying the failure is permanent lets the agent stop and report honestly."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

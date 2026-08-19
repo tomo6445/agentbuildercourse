@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M8 &middot; Evaluation: the discipline that separates demos from products — Building AI Agents</title>
+<meta name="description" content="If you cannot evaluate it, you cannot improve it, and you should not ship it.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Phase 2 &middot; M8</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">M8</span><span class="pill core">core path</span><span class="pill">3.5 h</span><span class="pill">phase 2 &middot; Making agents good</span></div>
+  <h1>Evaluation: the discipline that separates demos from products</h1>
+  <p class="line">If you cannot evaluate it, you cannot improve it, and you should not ship it.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-discipline-that-separates-demos-from-products">The discipline that separates demos from products</a></li><li><a href="#why-agent-eval-is-harder">Why agent eval is harder</a></li><li><a href="#outcome-and-trajectory">Outcome and trajectory</a></li><li><a href="#start-with-twenty-cases">Start with twenty cases</a></li><li><a href="#llm-as-judge">LLM-as-judge</a></li><li class="sub"><a href="#the-biases-and-what-to-do-about-them">The biases, and what to do about them</a></li><li><a href="#validate-the-judge">Validate the judge</a></li><li><a href="#human-evaluation-is-irreplaceable">Human evaluation is irreplaceable</a></li><li><a href="#evals-in-ci">Evals in CI</a></li><li><a href="#metrics-beyond-accuracy">Metrics beyond accuracy</a></li><li><a href="#self-improvement-and-the-trap">Self-improvement, and the trap</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Say why agent evaluation is structurally harder than model evaluation</li><li>Distinguish outcome from trajectory evaluation, and use both</li><li>Build a useful eval set from ~20 real cases instead of waiting for 500</li><li>Write an LLM judge rubric, then validate the judge before trusting a number</li><li>Run evals in CI under a cost cap, with stochasticity handled honestly</li><li>Feed failures back into improvement without overfitting to your own set</li></ul></div>
+<h2 id="the-discipline-that-separates-demos-from-products">The discipline that separates demos from products</h2>
+<p>Most agent projects that die do not die of a hard technical problem. They die because nobody could tell whether a change made things better, so changes stopped being made, and the thing that worked in the demo kept not working in production for reasons nobody could name.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>If you cannot evaluate it, you cannot improve it, and you should not ship it.</p></div></aside>
+<h2 id="why-agent-eval-is-harder">Why agent eval is harder</h2>
+<p>Evaluating a single model call is comparatively easy: one input, one output, compare to a reference. Agents break every one of those assumptions.</p>
+<p><strong>Multi-step.</strong> Failure can occur at any turn, and the <em>observable</em> failure is often several turns downstream of the <em>actual</em> one.</p>
+<p><strong>Stochastic.</strong> The same input produces different trajectories. A single run tells you almost nothing; you need repeats, and you need to look at variance.</p>
+<p><strong>Path-dependent.</strong> An early tool choice constrains everything after it. Two runs that both "fail" may have failed for unrelated reasons.</p>
+<p><strong>Many valid paths.</strong> Often several trajectories reach an equally good answer. An eval that asserts one specific path punishes correct behaviour and will be tuned away by whoever is trying to make the number go up.</p>
+<p><strong>Environmental.</strong> Agents touch real systems. Your eval needs a fixture environment that is deterministic enough to compare against and realistic enough to be worth comparing.</p>
+<h2 id="outcome-and-trajectory">Outcome and trajectory</h2>
+<p><strong>Outcome evaluation</strong> asks: is the final answer right? Necessary, insufficient.</p>
+<p><strong>Trajectory evaluation</strong> asks: did it get there sensibly? Did it call the tools it should have, avoid the ones it shouldn't, stay within a reasonable turn count, and not do anything alarming on the way?</p>
+<p>You need both, because outcome-only evaluation cannot distinguish an agent that reasoned correctly from one that guessed. Consider a query with two plausible answers where the agent picks one at random and happens to be right. Outcome: pass. Trajectory: it never called the tool that disambiguates. That agent will fail tomorrow, and your eval suite just told you it was fine.</p>
+<figure class="code" data-lang="python"><div class="code-title">evals/case.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">from dataclasses import dataclass, field
+
+
+@dataclass
+class EvalCase:
+    id: str
+    prompt: str
+    tier: str                                   # &#x27;easy&#x27; | &#x27;realistic&#x27; | &#x27;hard&#x27;
+
+    # Outcome assertions
+    must_contain: list = field(default_factory=list)
+    must_not_contain: list = field(default_factory=list)
+    judge_rubric: str | None = None
+
+    # Trajectory assertions
+    must_call: list = field(default_factory=list)        # tools that must appear
+    must_not_call: list = field(default_factory=list)    # tools that must not
+    max_turns: int = 15
+    max_usd: float = 0.25</code></pre></figure>
+<p>Note <code>must_not_call</code> and <code>max_usd</code>. An agent that gets the right answer by calling <code>delete_and_recreate</code>, or by spending four dollars, has not passed.</p>
+<h2 id="start-with-twenty-cases">Start with twenty cases</h2>
+<p>The most common reason a team has no eval set is that they are waiting until they can build a good one. Do not wait.</p>
+<p>Twenty real cases — drawn from actual usage, actual tickets, actual questions — is enough to catch the failures that matter. Prompt changes have been observed moving success rates from around 30% to around 80% at that sample size, because the first tranche of failures is usually systematic rather than subtle. You do not need statistical power to find a systematic bug; you need examples.</p>
+<p>How to pick them:</p>
+<ul><li><strong>Sample from reality</strong>, not from imagination. Your imagination produces the happy path.</li><li><strong>Cover three tiers.</strong> Easy (should always pass — these catch regressions), realistic (the actual distribution), hard (should sometimes fail — these are your headroom).</li><li><strong>Include the ones you are afraid of.</strong> The ambiguous request, the one where the right answer is "I don't know", the one where the correct action is to escalate.</li><li><strong>Include cases that should fail closed.</strong> The agent should refuse, abstain or ask. If nothing in your suite rewards abstention, you will train it out.</li></ul>
+<p>Then grow the set from production failures. Every incident becomes a case. This is the flywheel.</p>
+<h2 id="llm-as-judge">LLM-as-judge</h2>
+<p>For anything with an open-ended output, you need a model to grade it. This works, and it fails in specific documented ways.</p>
+<p>A rubric with named dimensions beats "is this good?" by a wide margin:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">Score the response on each dimension. Cite evidence from the response for each score.
+
+FACTUAL ACCURACY (0-3)  Are the claims correct per the source documents?
+                        0 = contains a false claim; 3 = all claims verified.
+CITATIONS (0-3)         Is every factual claim attributed to a specific source?
+                        0 = no citations; 3 = every claim cited to document and location.
+COMPLETENESS (0-3)      Does it address every part of the question?
+                        An explicit &quot;not available in the sources&quot; counts as complete.
+SOURCE QUALITY (0-3)    Are sources authoritative? 0 = SEO content farm or blog aggregator;
+                        3 = primary sources or official documentation.
+TOOL EFFICIENCY (0-3)   Was the work proportionate? Penalise redundant and repeated calls.
+
+Output JSON: {&quot;factual&quot;: n, &quot;citations&quot;: n, &quot;completeness&quot;: n,
+              &quot;source_quality&quot;: n, &quot;tool_efficiency&quot;: n, &quot;evidence&quot;: &quot;...&quot;}
+PASS requires factual &gt;= 2, citations &gt;= 2, and no dimension at 0.</code></pre></figure>
+<p>Note what that rubric had to say explicitly: that abstention counts as complete, and that SEO aggregators are low-quality sources. Judges do not infer standards you did not write down.</p>
+<h3 id="the-biases-and-what-to-do-about-them">The biases, and what to do about them</h3>
+<p><strong>Position bias.</strong> In pairwise comparison, judges favour one position. Mitigate by running both orders and discarding disagreements, or by scoring absolutely rather than comparatively.</p>
+<p><strong>Verbosity bias.</strong> Longer, more fluent answers score higher regardless of substance. Mitigate with explicit length-independent criteria, and by including a padded-but-wrong case in your judge validation set.</p>
+<p><strong>Self-preference.</strong> Judges favour output from the same model family. Mitigate by using a different model as judge, or by anchoring scores to reference answers.</p>
+<p><strong>Leniency drift.</strong> Judges pass borderline cases. Mitigate by anchoring each score with a concrete example of what a 0 and a 3 look like.</p>
+<h2 id="validate-the-judge">Validate the judge</h2>
+<p>An unvalidated judge is a random number generator with good manners. Before you trust it:</p>
+<ol><li>Hand-label 30 outputs yourself, against the rubric, <strong>before</strong> seeing the judge's labels.</li><li>Run the judge on the same 30.</li><li>Measure agreement — and measure Cohen's kappa, not raw agreement.</li><li>Read every disagreement. The judge is usually right about something you under-specified.</li><li>Fix the rubric. Re-measure. Repeat until kappa clears your threshold.</li></ol>
+<p>Raw agreement lies. On a set where 80% of cases pass, a judge that passes everything scores 80% and is worthless. Kappa corrects for chance agreement and exposes it.</p>
+<div class="widget" data-widget="judge-agreement" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<p>And the rule that has to be stated because the temptation is real: <strong>when the judge and your labels disagree, you fix the rubric, never the labels.</strong> Adjusting the reference to match the judge is how teams produce a suite that agrees with itself and nothing else.</p>
+<h2 id="human-evaluation-is-irreplaceable">Human evaluation is irreplaceable</h2>
+<p>Sit down and read fifty transcripts. Not summaries — transcripts.</p>
+<p>You will find things no automated eval was looking for, because automated evals only check what someone thought to assert. The canonical example: an agent whose answers were factually correct and well-cited, passing every check, which had quietly learned to prefer SEO content farms over authoritative sources — because the farms were easier to extract clean quotes from. No rubric dimension existed for source quality until a human noticed. Then it became one.</p>
+<p>Budget for this. Every significant change, before it ships.</p>
+<h2 id="evals-in-ci">Evals in CI</h2>
+<p>An eval suite that runs when someone remembers is not a control.</p>
+<figure class="code" data-lang="yaml"><div class="code-title">.github/workflows/evals.yml</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-yaml">- name: Agent evals
+  run: python -m evals.run --tier easy,realistic --repeats 3 --cost-cap 5.00
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}</code></pre></figure>
+<p>Four things this needs to work in practice.</p>
+<p><strong>Handle stochasticity honestly.</strong> Run each case N times and set the threshold on the aggregate. A single flaky failure must not block a merge, and a case that passes 2 of 5 times is <em>failing</em> even though it is green sometimes. Report pass <em>rates</em>, not pass/fail.</p>
+<p><strong>Cap the cost of the eval job itself.</strong> An eval suite that can spend unboundedly on a PR is its own incident. Cap it, and fail the job if the cap is hit.</p>
+<p><strong>Tier what blocks the merge.</strong> Easy tier must be 100% — any failure is a regression. Realistic tier blocks below a threshold. Hard tier is reported, never blocking, or people will delete the hard cases.</p>
+<p><strong>Track cost and turn count as first-class metrics.</strong> A change that keeps accuracy and doubles cost is a regression. If your CI only reports accuracy, that regression ships.</p>
+<h2 id="metrics-beyond-accuracy">Metrics beyond accuracy</h2>
+<div class="table-wrap"><table><thead><tr><th>Metric</th><th>Why it matters</th></tr></thead><tbody><tr><td>Tokens per task</td><td>The cost model's dominant input (M12)</td></tr><tr><td>Tool calls per task</td><td>Efficiency, and an early oscillation signal</td></tr><tr><td>Wall-clock p50/p95</td><td>p95 is what users experience</td></tr><tr><td>Cost per task</td><td>The number the business cares about</td></tr><tr><td>Failure taxonomy</td><td><em>Which</em> failure class, not just how many</td></tr><tr><td><strong>Variance</strong></td><td>High variance at the same mean is a worse product</td></tr></tbody></table></div>
+<p>Variance is the one that gets left out. An agent that is right 90% of the time with low variance is a product. One that averages 90% by being brilliant on Mondays and useless on Tuesdays is a support burden, and the mean hides it entirely.</p>
+<h2 id="self-improvement-and-the-trap">Self-improvement, and the trap</h2>
+<p>Feed failing transcripts back to a model with the tool definitions and prompts, and ask what went wrong and what to change. It is remarkably effective — reported efficiency gains in the region of 40% — for the same reason as in M2: it is the reader you are writing for.</p>
+<p>The trap is overfitting. Iterating against the same twenty cases eventually produces a system tuned to those twenty cases. Guard it: <strong>hold out cases the improvement loop never sees</strong>, refresh the set from production regularly, and treat a suspiciously large jump as evidence of leakage rather than success.</p>
+<aside class="callout c-autopsy"><h4>The 95% agent that failed in production</h4><div class="callout-body"><p>Passing 95% in the suite, visibly bad in the wild. The suite had been written by the team, from memory, in an afternoon — which meant it encoded the questions they <em>expected</em>. Every case was well-formed, unambiguous, answerable from one document, and phrased the way an engineer phrases things.</p>
+<p>Real traffic was none of those. Users asked compound questions, referenced things not in the corpus, phrased requests ambiguously, and frequently wanted an answer the sources could not support. The agent had never been evaluated on abstention, so it did what it had been optimised to do: answer confidently.</p>
+<p>The fix was procedural, not technical. Sample eval cases from <em>actual logs</em>, stratified — including the messy, the ambiguous and the unanswerable — and add every production failure to the set as a permanent case.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 8a — Evaluate M5's agent</h4><div class="callout-body"><p><code>labs/lab08_evals</code> — build a suite of at least 25 cases across three tiers, with both outcome and trajectory assertions and a written judge rubric.</p>
+<p>Then run your suite against <strong>another student's</strong> agent. Cross-evaluation exposes rubric ambiguity instantly: every place your rubric assumed something about your own implementation shows up as a bogus failure.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 8b — Judge validation</h4><div class="callout-body"><p>Hand-label 30 outputs before looking at the judge. Measure raw agreement and kappa, read every disagreement, fix the rubric, re-measure. <code>python -m lab08_evals.judge_validate</code> does the arithmetic and reports the confusion matrix; you do the reading.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab 8c — Observatory v2</h4><div class="callout-body"><p>Side-by-side eval run comparison: per-case deltas, regression highlighting, and cost and turn-count diffs alongside accuracy. The most useful screen you will build all course.</p></div></aside>
+<h2 id="further-reading">Further reading</h2>
+<ul><li><a href="https://docs.anthropic.com/en/docs/test-and-evaluate/eval-tool">Evaluating agents</a></li><li><a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents</a></li></ul>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Suite runs in CI under a cost cap; judge-human agreement above threshold; suite catches three injected regressions in a provided broken agent.</p>
+<p style="margin-top:9px"><code>pytest labs/lab08_evals -q</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab08_evals" style="margin-right:8px">lab08_evals &#8599;</a>
+  <button class="btn" id="completebtn" data-module="M8">mark complete</button>
+</div>
+<nav class="prevnext"><a href="m07.html"><span class="dir">&#8592; previous</span><span class="t">M7 &middot; Memory and state</span></a><a class="next" href="m09.html"><span class="dir">next &#8594;</span><span class="t">M9 &middot; Multi-agent systems: when more agents help</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "m08", "questions": [{"q": "An agent answers a question correctly without ever calling the tool that disambiguates it \u2014 it guessed between two plausible answers and got lucky. Which evaluation catches this?", "options": ["Outcome evaluation", "Trajectory evaluation", "LLM-as-judge on the final answer", "A larger eval set"], "answer": 1, "why": "Outcome evaluation \u2014 including a judge reading the final answer \u2014 sees a correct response and passes it. Only trajectory evaluation, asserting which tools were and were not called, distinguishes reasoning from a lucky guess. That agent will fail tomorrow and your suite just certified it."}, {"q": "Your judge agrees with your human labels 84% of the time on a set where 80% of cases pass. What should you conclude?", "options": ["The judge is good enough to ship", "Almost nothing \u2014 a judge that passes everything would score 80%, so you need kappa to see whether 84% beats chance", "The judge is biased against passing cases", "The human labels are probably wrong"], "answer": 1, "why": "Raw agreement is dominated by the base rate. Cohen's kappa corrects for the agreement you would get by chance, and on this set an 84% raw score may be close to worthless. Compute kappa, then read every disagreement \u2014 the judge is usually right about something the rubric under-specified."}, {"q": "You are adding evals to CI. Which policy is soundest?", "options": ["Any single case failure blocks the merge", "Run each case once; retry the whole suite if anything fails", "Run each case N times, block on aggregate pass rates by tier, and cap the eval job's spend", "Run only the hard tier, since easy cases always pass"], "answer": 2, "why": "Agents are stochastic, so single runs are noise and pass <em>rates</em> are the honest measure. Tiering keeps easy-tier regressions blocking while stopping people from deleting hard cases to get green. And an eval job that can spend unboundedly on a PR is its own incident."}, {"q": "Manual transcript review famously caught an agent preferring SEO content farms to authoritative sources. Why did no automated eval catch it first?", "options": ["The judge model was too small", "Automated evals only check what someone thought to assert, and no rubric dimension for source quality existed yet", "The eval set was too small to reach significance", "The failures were intermittent"], "answer": 1, "why": "The answers were factually correct and properly cited, so every existing check passed. Automated evaluation is exhaustive only over the dimensions you wrote down; discovering a dimension you did not know you needed is what human review is for. Afterwards it becomes a rubric dimension \u2014 and stays caught."}, {"q": "Two agents both average 90% success. One is consistent; the other alternates between excellent and useless. Why does this matter, and where does it show up?", "options": ["It does not matter \u2014 the mean is the mean", "Variance determines user trust and support load, and reporting only the mean hides it entirely", "The inconsistent one is cheaper to run", "It only matters if the variance correlates with input difficulty"], "answer": 1, "why": "Users experience the distribution, not the mean. High variance at the same average produces a product people cannot rely on and a support burden \u2014 and it is invisible in any report that shows only average accuracy, which is why variance belongs in the metrics table alongside cost and p95 latency."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>
