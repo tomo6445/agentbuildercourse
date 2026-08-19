@@ -1,0 +1,119 @@
+# Building AI Agents
+
+**From first principles to production.** Sixteen modules for working developers.
+You write the agent loop by hand before you're allowed near a framework — then
+you learn to evaluate it, secure it, cost it, and ship it.
+
+Claude-first stack; transferable mechanics.
+
+---
+
+## Two halves
+
+**The course site** — sixteen lesson pages with teaching prose, runnable code,
+knowledge checks, and thirteen interactive instruments. Static HTML, no build
+step to read it, works from a `file://` path.
+
+```bash
+open docs/index.html          # or: python3 -m http.server -d docs
+```
+
+**The labs** — sixteen Python packages where every ship gate is a test.
+
+```bash
+pip install -e "labs[dev]"
+pytest labs -q                # 187 tests, offline, no API key
+```
+
+---
+
+## Start here
+
+1. Open `docs/index.html` and read **M1 — The Loop**.
+2. `cp labs/lab01_tinyagent/starter/tinyagent.py labs/lab01_tinyagent/tinyagent.py`
+3. `pytest labs/lab01_tinyagent -q` — twelve failures. Make them pass.
+4. `python -m lab01b_observatory.render --demo -o observatory.html` — the trace
+   viewer you'll extend for the next fifteen modules.
+
+---
+
+## The shape of it
+
+| Phase | Modules | What it covers |
+|---|---|---|
+| **0 · Mechanics** | M1–M3 | The loop, tool design, context — all by hand, no frameworks |
+| **1 · Building blocks** | M4–M6 | Choosing autonomy, the production harness, MCP |
+| **2 · Making agents good** | M7–M9 | Memory, evaluation, multi-agent |
+| **3 · Production** | M10–M13 | Observability, security, cost, the human interface |
+| **4 · Applied** | M14–M16 | Skills and packaging, eight domains, the capstone |
+
+52.5 hours. A 40-hour core path if you skip M13 and M15. Ten weeks as a cohort.
+
+## Three pillars
+
+**First principles before abstractions.** M1 is a small agent against the raw
+API. Every later abstraction is mapped back to the line it replaces. Students who
+understand the loop can debug any harness; students who only know a harness can
+debug nothing.
+
+**Informating, not just automating.** The spine is the Observatory — a trace
+viewer built in M1 and extended for fifteen modules. By the end you aren't
+guessing why an agent misbehaved; you're reading it.
+
+**Ship gates, not quizzes.** Each module ends in a runnable suite the artifact
+must pass. The M8 gate is "write the eval suite for M5's agent". The course eats
+its own tail on purpose.
+
+---
+
+## Repository layout
+
+```
+content/        lesson sources (Markdown + course.py structure)
+assets/         design system, front-end runtime, interactive widgets
+tools/          build.py (content -> docs/), mdlite.py, verify_site.py
+docs/           the generated site, committed so it just works
+labs/           sixteen lab packages + the shared agentcourse library
+```
+
+### Working on the course
+
+```bash
+python3 tools/build.py            # regenerate docs/ from content/
+python3 tools/build.py --check    # CI check: is docs/ stale?
+python3 tools/verify_site.py      # 136 browser checks over the built site
+pytest labs -q                    # every ship gate
+```
+
+The build has **no dependencies** — a single `python3` invocation, no pip
+install, no network. `docs/` is committed so the site works from a clone.
+
+---
+
+## Honesty about what runs offline
+
+The labs run against a scripted model so the gates are deterministic, free, and
+safe in CI. Most labs test real logic — path resolution, the MCP protocol
+shapes, permission behaviour, trace diagnosis, injection screening, backoff and
+circuit breaking. A few simulate model behaviour to make an exercise gradeable,
+and `labs/README.md` says exactly which, and what each simulation cannot tell
+you.
+
+Every lab also runs against the real model with `--live`.
+
+Prices live in one table (`labs/agentcourse/cost.py`) and are inputs rather than
+constants. Check current published rates before quoting any figure this course
+produces.
+
+---
+
+## Provenance
+
+Built from a syllabus design document. Content on the Claude API surface — model
+IDs, adaptive thinking, `output_config` effort, structured outputs, context
+editing versus compaction, tool search, and the Tool Runner / Agent SDK /
+Managed Agents distinction — was checked against current reference material
+rather than written from recall.
+
+Where a course claim is a measurement, the lab that produces it is cited in the
+lesson, and the number in the lesson is the number the lab actually prints.
