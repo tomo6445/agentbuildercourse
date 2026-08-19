@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentcourse"
+version = "1.0.0"
+description = "Lab code for Building AI Agents — from first principles to production"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+# The labs run offline against a scripted model, so the base install has no
+# dependencies at all. These are only needed to run against the real API or to
+# complete the optional live variants of a lab.
+dev  = ["pytest>=7.4"]
+live = ["anthropic>=0.40"]
+mcp  = ["mcp>=1.0"]
+otel = ["opentelemetry-api>=1.20", "opentelemetry-sdk>=1.20"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["agentcourse*", "lab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+markers = [
+  "live: runs against the real Claude API; needs ANTHROPIC_API_KEY (deselected by default)",
+  "slow: takes more than a second",
+]
