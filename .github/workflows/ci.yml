@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  labs:
+    name: labs (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "labs[dev]"
+      - name: Run the lab suites
+        # Every gate in the course is a test. They run offline against a
+        # scripted model, so CI needs no API key and no network.
+        run: pytest labs -q
+
+  site:
+    name: site is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify docs/ matches content/
+        run: python3 tools/build.py --check
