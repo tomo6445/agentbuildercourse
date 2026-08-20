@@ -24,97 +24,96 @@
 </header>
 
 <div class="lesson-layout">
-<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-real-benefit-is-not-specialisation">The real benefit is not specialisation</a></li><li><a href="#when-it-works">When it works</a></li><li><a href="#when-it-fails">When it fails</a></li><li><a href="#the-orchestrator-worker-shape">The orchestrator-worker shape</a></li><li><a href="#delegation-prompts-are-the-hard-part">Delegation prompts are the hard part</a></li><li><a href="#effort-scaling-heuristics">Effort-scaling heuristics</a></li><li><a href="#synthesis-is-the-leads-hardest-job">Synthesis is the lead&#x27;s hardest job</a></li><li><a href="#the-decision-rule">The decision rule</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#what-it-actually-buys-you">What it actually buys you</a></li><li><a href="#when-it-pays">When it pays</a></li><li><a href="#when-it-fails">When it fails</a></li><li><a href="#the-instructions-are-the-hard-part">The instructions are the hard part</a></li><li><a href="#how-many-workers">How many workers</a></li><li><a href="#combining-is-the-leads-hardest-job">Combining is the lead&#x27;s hardest job</a></li><li><a href="#the-decision-rule">The decision rule</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
 <article class="lesson" id="main">
-<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Identify context isolation, not specialisation, as the real benefit of multi-agent systems</li><li>Predict when orchestrator-workers wins and when it burns money for nothing</li><li>Write delegation prompts precise enough that workers do not duplicate each other</li><li>Embed effort-scaling heuristics so worker count matches task size</li><li>Synthesise conflicting findings without losing citations</li><li>Find the knee on the quality-cost curve and defend a worker count with numbers</li></ul></div>
-<h2 id="the-real-benefit-is-not-specialisation">The real benefit is not specialisation</h2>
-<p>The usual pitch for multi-agent systems is specialisation: a research agent, a writing agent, a critic. That framing is mostly wrong, because a single model with a good prompt can play all three roles competently.</p>
-<p>The actual benefit is <strong>context isolation</strong>. Each sub-agent gets its own window. A worker can read twenty documents, burn 80,000 tokens exploring, and return a two-paragraph finding. The orchestrator's context grows by two paragraphs.</p>
-<p>That is the trick. Not "the researcher is better at researching" but "the researcher's mess stays in the researcher's window."</p>
-<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Multi-agent systems can burn many times the tokens of a single chat. The task has to be worth it.</p></div></aside>
-<h2 id="when-it-works">When it works</h2>
-<p>On wide search tasks — where the work is finding and reading many sources in parallel — token budget explains most of the performance variance between systems. If the task's difficulty is proportional to how much material must be examined, then more parallel context is directly more capability.</p>
-<p>Under those conditions, an orchestrator running a strong lead model with a pool of cheaper workers has been measured substantially ahead of a strong single agent on research benchmarks. The mechanism is unglamorous: the multi-agent system simply read more, and the lead saw only the conclusions.</p>
-<p>The conditions that make it work, all of which must hold:</p>
-<ul><li>The task <strong>parallelises</strong>. Independent sub-questions, not a chain where step 2 needs step 1.</li><li>The work is <strong>read-heavy</strong>. Gathering and filtering, not a long sequence of mutations.</li><li>The task is <strong>valuable enough</strong> to absorb the token multiple.</li></ul>
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Say what several agents actually buy you, which is not what most people think</li><li>Recognise the tasks where it pays and the tasks where it burns money</li><li>Write instructions precise enough that helpers do not duplicate each other</li><li>Decide how many helpers from the shape of the task rather than by habit</li><li>Combine conflicting findings without inventing a confident wrong answer</li><li>Find the point where adding another helper stops being worth it</li></ul></div>
+<h2 id="what-it-actually-buys-you">What it actually buys you</h2>
+<p>The usual pitch is specialisation: a research agent, a writing agent, a critic. That framing is mostly wrong — a single model with good instructions plays all three perfectly well.</p>
+<p>The real benefit is <strong>separate context windows</strong>.</p>
+<p>Remember from M3 that everything an agent reads stays in its conversation and gets re-sent every turn. A helper with its own window can read twenty documents, burn 80,000 tokens exploring, and hand back two paragraphs. Your main conversation grows by two paragraphs.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Not "the researcher is better at researching", but "the researcher's mess stays in the researcher's window".</p></div></aside>
+<aside class="jargon"><h4>Orchestrator and workers</h4><div class="callout-body"><p>The <strong>orchestrator</strong> (or lead) is the agent that decides how to split the task, hands pieces out, and combines what comes back. <strong>Workers</strong> (or subagents) are separate agents that each do one piece.</p>
+<p>Each worker is a complete agent as built in M1 — its own loop, its own conversation, its own tools.</p></div></aside>
+<p>And the price, plainly: <strong>several times the tokens of a single agent.</strong> You are paying for a whole extra context per worker.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Several agents can cost many times a single one. The task has to be worth it.</p></div></aside>
+<h2 id="when-it-pays">When it pays</h2>
+<p>On wide searching — where the work is finding and reading a lot of material — how much you can read largely determines how well you do. More parallel context is then directly more capability.</p>
+<p>Three conditions, and <strong>all three</strong> must hold:</p>
+<ul><li><strong>The work splits.</strong> Genuinely independent pieces, not a chain where step 2 needs step 1's answer.</li><li><strong>It is mostly reading.</strong> Gathering and filtering, not a sequence of changes to something.</li><li><strong>It is worth the multiple.</strong> The value of one completed task can absorb several times the cost.</li></ul>
 <h2 id="when-it-fails">When it fails</h2>
-<p><strong>Duplicated work.</strong> Two workers given overlapping briefs run nearly the same searches and return nearly the same findings. You paid twice for one result. This is the most common failure and it is a prompt problem, not a code problem.</p>
-<p><strong>Contradictory findings.</strong> Worker A says the figure is 2.1B, worker B says 2.15B. Now the orchestrator must adjudicate — and its most common instinct is to average them or pick the better-written one, both of which are wrong.</p>
-<p><strong>Coordination overhead.</strong> Delegating, waiting, synthesising all cost turns and tokens. Below a certain task size, the overhead exceeds the benefit and one agent doing it directly is faster and better.</p>
-<p><strong>Synchronous bottlenecks.</strong> An orchestrator that waits for all workers runs at the speed of the slowest, and one hung worker stalls everything.</p>
-<p><strong>Cost.</strong> The multiple is real. Budget for it before building, not after the first invoice.</p>
-<h2 id="the-orchestrator-worker-shape">The orchestrator-worker shape</h2>
-<figure class="code" data-lang="python"><div class="code-title">orchestrator.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def run(lead, worker_pool, task):
-    plan = lead.plan(task)                       # decides subtasks AND how many
-    briefs = plan[&quot;subtasks&quot;]
+<p><strong>They do each other's work.</strong> Two workers with overlapping instructions run nearly the same searches and hand back nearly the same findings. You paid twice for one result. This is the most common failure, and it is an instructions problem rather than a code problem.</p>
+<p><strong>They disagree.</strong> Worker A says 2.1B, worker B says 2.15B. Now the lead has to decide — and its instinct is often to average them or pick the better-written one, both of which are wrong.</p>
+<p><strong>Coordinating costs something.</strong> Splitting up, waiting, and combining all take turns and tokens. Below a certain size the overhead exceeds the benefit and one agent doing it directly is faster and better.</p>
+<p><strong>One slow worker holds everything up</strong>, and one hung worker stalls the lot.</p>
+<h2 id="the-instructions-are-the-hard-part">The instructions are the hard part</h2>
+<p>This is where these systems are actually built or lost. A vague brief produces overlapping, uncitable, unusable findings, and no amount of clever coordination recovers from it.</p>
+<p>A worker's instructions need five things:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">TASK: Find the FY2025 revenue figure for Acme Corp and the year-on-year change.
 
-    findings = run_concurrently(
-        worker_pool.run(brief) for brief in briefs
-    )                                             # failures return a marker, never raise
+SCOPE: Revenue only. Do NOT look into margins, headcount, competitors or
+       outlook — other workers are covering those. If you come across
+       something relevant outside your scope, note the source and move on.
 
-    return lead.synthesise(task, findings)
+TOOLS: search, fetch_document. You may not write files or send anything.
 
+EFFORT: This is a single-fact lookup. Expect 2-4 searches. Stop once you have
+        a figure from a primary source; do not keep looking for more
+        confirmation beyond two independent sources.
 
-def effort(task_kind):
-    &quot;&quot;&quot;Worker count is a decision, not a constant.&quot;&quot;&quot;
-    return {
-        &quot;simple_fact&quot;:      1,     # one lookup; a pool here is pure waste
-        &quot;comparison&quot;:       3,     # one per thing compared
-        &quot;open_research&quot;:    8,     # genuinely wide; cap it
-    }[task_kind]</code></pre></figure>
-<p>Two details in that sketch carry most of the weight. Worker failures return a marker rather than raising, so one dead worker degrades the answer instead of killing the run. And worker count is computed from the task, not fixed — which is the next section.</p>
-<h2 id="delegation-prompts-are-the-hard-part">Delegation prompts are the hard part</h2>
-<p>This is where multi-agent systems are actually built or lost. A vague brief produces overlapping, unciteable, unusable findings, and no amount of orchestrator cleverness recovers from it.</p>
-<p>A worker brief needs five things:</p>
-<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">TASK: Find the FY2025 revenue figure for Acme Corp and its year-over-year change.
+OUTPUT: JSON with keys: figure, yoy_change, sources (each with url, quote,
+        date), confidence (high/medium/low), caveats.</code></pre></figure>
+<p><strong>Say what the others are doing.</strong> That SCOPE line is what stops duplication. Without it, every worker helpfully investigates the interesting adjacent thing.</p>
+<p><strong>Restrict tools per worker.</strong> A read-only worker should be read-only in configuration, not by request. This is also a security control (M11): a worker reading untrusted web pages should not be holding tools that write.</p>
+<p><strong>Say how much work this is worth.</strong> Without a stated expectation, a worker runs until it feels finished — and for a model on an open-ended search, that is a long way out.</p>
+<p><strong>Demand a fixed output shape.</strong> The lead has to combine these. Prose does not combine.</p>
+<p><strong>Require confidence and caveats.</strong> They give the lead something to work with when findings conflict, instead of guessing.</p>
+<h2 id="how-many-workers">How many workers</h2>
+<p>A fixed number is how you end up with eight agents on a question one lookup answers, and one agent on a question needing twenty. Put the rule in the lead's instructions:</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">Choose how many workers from the shape of the task:
 
-SCOPE: Revenue only. Do NOT investigate margins, headcount, competitors or
-       guidance — other workers are covering those. If you encounter relevant
-       material outside your scope, note the source and move on.
+  a single fact, one source        -&gt; 1
+  comparing N things               -&gt; N workers, one each, up to 6
+  open-ended research              -&gt; 5-10, split by sub-question
+  a survey with a known list       -&gt; one per item, batched, up to 12
 
-TOOLS: web_search, fetch_document. You may not write files or send messages.
-
-EFFORT: This is a single-fact lookup. Expect 2-4 searches. Stop when you have a
-        figure from a primary source; do not keep searching for corroboration
-        beyond two independent sources.
-
-OUTPUT: JSON — {&quot;figure&quot;: str, &quot;yoy_change&quot;: str, &quot;sources&quot;: [{&quot;url&quot;: str,
-        &quot;quote&quot;: str, &quot;date&quot;: str}], &quot;confidence&quot;: &quot;high&quot;|&quot;medium&quot;|&quot;low&quot;,
-        &quot;caveats&quot;: str}</code></pre></figure>
-<p><strong>Scope with explicit negative space.</strong> "Revenue only, others are covering margins" is what prevents duplication. Without it, every worker helpfully investigates the interesting adjacent thing.</p>
-<p><strong>Tool restrictions per worker.</strong> Read-only workers should be read-only in configuration, not by request. This is also a security control (M11): a worker exposed to untrusted web content should not be holding write tools.</p>
-<p><strong>Effort scaling, stated.</strong> Without a stated expectation, workers run until they feel finished — and "finished" for a language model on an open-ended search is a long way out. Say roughly how much work this is worth.</p>
-<p><strong>A structured output contract.</strong> The orchestrator must merge findings. Prose does not merge.</p>
-<p><strong>Confidence and caveats as required fields.</strong> They give the lead something to adjudicate with when findings conflict, instead of guessing.</p>
-<h2 id="effort-scaling-heuristics">Effort-scaling heuristics</h2>
-<p>Fixed worker counts are how you get eight agents on a question one lookup would answer, and one agent on a question needing twenty. Put the scaling rule in the orchestrator's prompt:</p>
-<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">Choose the number of subagents by the shape of the task:
-
-  a single fact, one source           -&gt; 1 subagent
-  a comparison across N things        -&gt; N subagents, one each, N &lt;= 6
-  open-ended research                 -&gt; 5-10, split by sub-question
-  a survey with a known list          -&gt; one per item, batched, cap 12
-
-Do not exceed 12. If the task seems to need more, the decomposition is wrong —
-split it into two rounds instead.</code></pre></figure>
+Never exceed 12. If it seems to need more, the split is wrong — do two rounds
+instead.</code></pre></figure>
 <div class="widget" data-widget="worker-knee" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
-<h2 id="synthesis-is-the-leads-hardest-job">Synthesis is the lead's hardest job</h2>
-<p>Everything so far was preparation for this. The lead now holds N findings and must produce one answer.</p>
-<p><strong>Conflict resolution needs a rule, stated in advance.</strong> Prefer primary sources over secondary. Prefer recent over old <em>for facts that change</em>. Prefer the higher-confidence finding when sources are equally good. When a conflict cannot be resolved, <strong>surface it</strong> — "sources disagree: the 10-K says 2.1B, the press release says 2.15B" is a far better answer than a confident average.</p>
-<p><strong>Citations must survive.</strong> The lead is rewriting text, and rewriting is exactly when attributions get dropped. Require the synthesis to carry source references through to the final output; assert it in the eval suite.</p>
-<p><strong>And the failure to design against explicitly:</strong> three workers return confidently wrong findings and the lead synthesises them into a fluent, well-structured, entirely false answer. The multi-agent structure <em>amplified</em> the error, because agreement between workers reads as corroboration. Defences: require sources for every claim, have the lead check whether workers actually used independent sources, and treat unanimous confidence on a hard question as suspicious rather than reassuring.</p>
+<h2 id="combining-is-the-leads-hardest-job">Combining is the lead's hardest job</h2>
+<p>Everything so far was preparation for this. The lead now holds several findings and must produce one answer.</p>
+<p><strong>Decide conflicts by a rule you set in advance.</strong> Prefer primary sources over secondary. Prefer recent over old <em>for things that change</em>. Prefer higher confidence when sources are equally good.</p>
+<p><strong>When a conflict cannot be resolved, say so.</strong> <em>"Sources disagree: the annual report says 2.1B, the press release says 2.15B"</em> is a far better answer than a confident average.</p>
+<p><strong>Keep the citations.</strong> The lead is rewriting text, and rewriting is exactly when attributions get dropped. Require sources to survive into the final answer, and test for it.</p>
+<aside class="callout c-warn"><h4>Three confident workers can be confidently wrong together</h4><div class="callout-body"><p>Three workers return the same wrong figure. The lead combines them into a fluent, well-organised, entirely false answer — because agreement reads as confirmation.</p>
+<p>The structure <strong>amplified</strong> the error rather than catching it.</p>
+<p>Defences: require a source for every claim, have the lead check whether the workers actually used <em>independent</em> sources, and treat unanimous confidence on a hard question as suspicious rather than reassuring.</p></div></aside>
+<aside class="callout c-autopsy"><h4>Two workers, same search, twice the bill</h4><div class="callout-body"><p>Two workers, briefed "research the competitive landscape" and "analyse market positioning".</p>
+<p>A person reads those as different questions. The workers ran seventeen searches between them, thirteen of them identical, and returned findings that overlapped by about 80%.</p>
+<p>The fix was not in code. It was a line in each brief naming what the <em>other</em> worker was covering, plus a shared list of what had already been searched. Duplicate searches dropped to two, with no loss of quality.</p>
+<p>That generalises: nearly every efficiency problem in these systems is an instructions problem, and the instinct to fix it with coordination code is an instinct to fix it in the wrong place.</p></div></aside>
+<details class="deeper"><summary>Failing gracefully when a worker dies</summary><div class="deeper-body"><p>A worker that crashes or hangs must not take the run with it. Have failures come back as a marker rather than an exception:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def run_worker(brief):
+    try:
+        return worker(brief)
+    except Exception as problem:
+        return Finding(topic=brief.topic, value=None, failed=True,
+                       note=&quot;worker failed: &quot; + str(problem))</code></pre></figure>
+<p>Then the lead's combining step reports what it could not cover:</p>
+<blockquote><p><em>"Revenue and outlook confirmed. Margin could not be established — that worker failed."</em></p></blockquote>
+<p>A partial answer that says what is missing is worth far more than a crash, and it is worth more than a complete-looking answer with a silent hole in it.</p>
+<p>Same idea as M1's rule that errors come back as results rather than crashes, one level up.</p></div></details>
 <h2 id="the-decision-rule">The decision rule</h2>
-<p>Before you build one, three things must be true:</p>
-<ol><li><strong>Parallelisable</strong> — genuine independent subtasks.</li><li><strong>Read-heavy</strong> — gathering and filtering, not a mutation sequence.</li><li><strong>Worth the multiple</strong> — the value per task can absorb several times the single-agent cost.</li></ol>
-<p>If all three hold, build it. If not, a single agent with good context management (M3) will be cheaper, faster and easier to debug.</p>
-<aside class="callout c-autopsy"><h4>Two subagents, same search, twice the bill</h4><div class="callout-body"><p>Two workers, briefs "research the competitive landscape" and "analyse market positioning". A human reads those as different questions. The workers ran seventeen searches between them, thirteen of them identical, and returned findings that overlapped by roughly 80%.</p>
-<p>The fix was not in code. It was a scope line in each brief naming what the <em>other</em> worker was covering, and a shared "already searched" list passed to each. Duplicate searches dropped to two, at no cost in quality. The lesson generalises: nearly every multi-agent efficiency bug is a delegation prompt bug, and the reflex to fix it with orchestration code is a reflex to fix it in the wrong place.</p></div></aside>
-<aside class="callout c-lab"><h4>Lab 9 — Build a research system</h4><div class="callout-body"><p><code>labs/lab09_multiagent</code> — an orchestrator plus a configurable worker pool. Required: explicit effort heuristics, per-subagent tool restrictions enforced in configuration, citation preservation through synthesis, and graceful degradation when a worker fails or hangs.</p>
-<p>The gate has two parts and both must pass: beat the single-agent baseline on the rubric, <strong>and</strong> come in under the cost-per-task ceiling. Quality alone is not a pass.</p></div></aside>
-<aside class="callout c-lab"><h4>Lab 9b — The economics report</h4><div class="callout-body"><p>Run the same 15 tasks at 1, 3 and 8 workers. Plot quality against cost, find the knee, and defend a recommendation. <code>python -m lab09_multiagent.economics</code> produces the table and the chart data.</p>
-<p>The knee is always lower than students expect. Notice your own prior before you run it, then notice how wrong it was.</p></div></aside>
-<h2 id="further-reading">Further reading</h2>
-<ul><li><a href="https://www.anthropic.com/engineering/multi-agent-research-system">How we built our multi-agent research system</a></li><li><a href="https://www.anthropic.com/engineering/building-effective-agents">Building effective agents</a></li></ul>
+<p>Before you build one, all three must be true:</p>
+<ol><li><strong>It splits</strong> into genuinely independent pieces.</li><li><strong>It is mostly reading</strong>, not a sequence of changes.</li><li><strong>It is worth the multiple.</strong></li></ol>
+<p>If not, a single agent with good context management (M3) will be cheaper, faster and far easier to debug.</p>
+<aside class="callout c-lab"><h4>Lab 9 — build a research system, then price it</h4><div class="callout-body"><p><code>labs/lab09_multiagent</code> is a lead plus a configurable pool of workers.</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 -m lab09_multiagent.economics
+pytest labs/lab09_multiagent -q</code></pre></figure>
+<p>The gate has <strong>two</strong> parts and both must pass: beat the single agent on quality <strong>and</strong> come in under the cost ceiling. Quality alone is not a pass — which is the whole point.</p>
+<p>The economics report is the memorable part. Quality gained per extra worker falls <strong>0.112 → 0.076 → 0.056</strong> while cost rises in a straight line. Notice what number you expected before running it.</p></div></aside>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li>The benefit is <strong>separate context windows</strong>, not specialisation.</li><li>It costs <strong>several times</strong> a single agent. All three conditions must hold: splits, mostly reading, worth the multiple.</li><li><strong>Instructions are where these systems are won or lost.</strong> Say what others are covering.</li><li><strong>Restrict tools per worker</strong>, in configuration.</li><li><strong>Say how much effort</strong> the task is worth, and choose worker count from its shape.</li><li>Surface conflicts rather than averaging. Keep citations. Treat unanimity on hard questions as a flag.</li></ul>
+<p>Next: seeing what your agent actually did.</p>
 <h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
 <div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Beats the single-agent baseline on rubric and passes a cost-per-task ceiling; economics report complete.</p>
 <p style="margin-top:9px"><code>pytest labs/lab09_multiagent -q</code></p></div></div>
@@ -133,7 +132,7 @@ split it into two rounds instead.</code></pre></figure>
   <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
   Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
 </footer>
-<script>window.QUIZ={"id": "m09", "questions": [{"q": "What is the primary benefit of an orchestrator-worker architecture?", "options": ["Specialised agents are individually better at their subtasks", "Context isolation \u2014 a worker's exploration stays in the worker's window, and only the finding reaches the lead", "It is cheaper than a single agent", "It removes the need for a turn cap"], "answer": 1, "why": "A single model with a good prompt plays all the specialist roles competently, so specialisation is not the win. The win is that a worker can burn 80,000 tokens reading and return two paragraphs \u2014 the orchestrator's context grows by two paragraphs. It is markedly more expensive, not less."}, {"q": "Two workers are briefed \"research the competitive landscape\" and \"analyse market positioning\". What happens, and where is the fix?", "options": ["They divide the work sensibly; no fix needed", "They largely duplicate each other's searches; the fix is scope with explicit negative space in each brief", "They contradict each other; the fix is a tie-break rule in synthesis", "One will fail; the fix is graceful degradation"], "answer": 1, "why": "A human reads those as different questions; the workers run mostly the same searches and return heavily overlapping findings. The fix is a delegation-prompt fix \u2014 tell each worker what the others are covering, and share an already-searched list. Reaching for orchestration code here is fixing it in the wrong place."}, {"q": "Which task shape is the <em>worst</em> fit for multi-agent?", "options": ["Surveying twenty companies' latest filings", "A sequential data migration where each step depends on the previous step's output", "Comparing four vendors across the same criteria", "Open-ended research across many sources"], "answer": 1, "why": "Multi-agent needs parallelisable, read-heavy work. A sequential mutation chain is neither: workers cannot run concurrently, and the coordination overhead is pure loss on top of a task a single agent handles directly and more safely."}, {"q": "Three workers independently return the same confident but wrong figure. What is the danger, and what defends against it?", "options": ["No danger \u2014 three independent confirmations is strong evidence", "The lead synthesises a fluent, false answer because agreement reads as corroboration; defend by requiring sources and checking source independence", "The lead will detect the error during synthesis automatically", "The turn cap will stop the run before synthesis"], "answer": 1, "why": "Multi-agent structure amplifies this failure rather than catching it, because unanimity looks like corroboration. Require a source for every claim, have the lead verify the workers actually used <em>independent</em> sources, and treat unanimous high confidence on a hard question as a flag rather than reassurance."}, {"q": "Your quality-versus-workers curve saturates around three to four workers while cost stays roughly linear. What follows?", "options": ["Use the maximum workers the budget allows", "The knee is where marginal quality per marginal dollar collapses \u2014 past it you are buying rounding error with real money", "The measurement is wrong; quality should scale with workers", "Switch to a single agent"], "answer": 1, "why": "Saturating quality against near-linear cost means each additional worker buys less and costs the same. The knee is the defensible operating point, it is usually lower than people expect, and it is a Decision Log number \u2014 measured on <em>your</em> task, since the curve shape transfers but the knee does not."}]};</script>
+<script>window.QUIZ={"id": "m09", "questions": [{"q": "What is the real benefit of splitting work across several agents?", "options": ["Specialised agents are better at their piece", "Each worker has its own context window, so its exploration never enters the main conversation", "It is cheaper than one agent", "It removes the need for a turn limit"], "answer": 1, "why": "A single model with good instructions plays all the specialist roles fine, so specialisation is not the win. The win is that a worker can burn 80,000 tokens reading and hand back two paragraphs. It is markedly more expensive than one agent, not less."}, {"q": "Two workers are briefed \"research the competitive landscape\" and \"analyse market positioning\". What happens, and where is the fix?", "options": ["They divide the work sensibly", "They largely duplicate each other; the fix is telling each what the others are covering", "They contradict each other; the fix is a tie-break rule", "One will fail; the fix is error handling"], "answer": 1, "why": "A person reads those as different questions; the workers run mostly the same searches and return heavily overlapping findings. The fix is in the instructions \u2014 name what the others cover and share what has already been searched. Reaching for coordination code here is fixing it in the wrong place."}, {"q": "Which task is the <em>worst</em> fit for several agents?", "options": ["Surveying twenty companies' filings", "A data migration where each step depends on the previous step's result", "Comparing four vendors against the same criteria", "Open-ended research across many sources"], "answer": 1, "why": "It needs work that splits and is mostly reading. A sequential chain of changes is neither: the pieces cannot run at the same time, and the coordination overhead is pure loss on top of a task one agent handles directly and more safely."}, {"q": "Three workers independently return the same confident but wrong figure. What is the danger?", "options": ["No danger \u2014 three confirmations is strong evidence", "The lead combines them into a fluent false answer, because agreement reads as confirmation", "The lead will notice automatically", "The turn limit will stop it"], "answer": 1, "why": "The structure amplifies this rather than catching it, because unanimity looks like corroboration. Require a source for every claim, have the lead check the workers actually used independent sources, and treat unanimous high confidence on a hard question as a flag rather than reassurance."}, {"q": "Quality gained per extra worker falls while cost keeps rising in a straight line. What follows?", "options": ["Use as many workers as the budget allows", "There is a point past which each extra worker buys almost nothing for full price \u2014 find it and stop there", "The measurement must be wrong", "Go back to a single agent"], "answer": 1, "why": "Flattening quality against straight-line cost means each additional worker buys less for the same money. That point is the defensible operating number, it is usually lower than people expect, and it is worth measuring on your own task \u2014 the curve's shape transfers, its exact position does not."}]};</script>
 <script src="../assets/widgets.js"></script>
 <script src="../assets/widgets-b.js"></script>
 <script src="../assets/course.js"></script>
