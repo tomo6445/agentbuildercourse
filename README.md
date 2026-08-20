@@ -106,7 +106,7 @@ labs/           sixteen lab packages + the shared agentcourse library
 ```bash
 python3 tools/build.py            # regenerate docs/ from content/
 python3 tools/build.py --check    # CI check: is docs/ stale?
-python3 tools/verify_site.py      # 136 browser checks over the built site
+python3 tools/verify_site.py      # 291 browser checks over the built site
 python3 tools/verify_site.py --base https://tomo6445.github.io/agentbuildercourse
 pytest labs -q                    # every ship gate
 ```

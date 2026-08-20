@@ -1,5 +1,5 @@
 """Load every generated page in a real browser and assert it works."""
-import argparse, os, pathlib, sys
+import argparse, html, os, pathlib, re, sys
 from playwright.sync_api import sync_playwright
 
 _ap = argparse.ArgumentParser(description="Drive the built site in a real browser.")
@@ -10,6 +10,18 @@ _args = _ap.parse_args()
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "docs"
 BASE = _args.base.rstrip("/") if _args.base else "file://%s" % ROOT
 fails, checks = [], 0
+
+# Source-of-truth for every code block, read straight out of the generated HTML
+# before any script runs. The highlighter rewrites these nodes in place, and a
+# highlighter bug is invisible to every other check on this page — it produces
+# well-formed markup that simply says something other than what the author
+# wrote. Compare the two and the class of bug cannot ship.
+_CODE_RE = re.compile(r'<code class="lang-[a-z]*">(.*?)</code>', re.S)
+
+def source_code_blocks(slug):
+    raw = (ROOT / "modules" / ("%s.html" % slug)).read_text(encoding="utf-8")
+    return [html.unescape(m.group(1)) for m in _CODE_RE.finditer(raw)]
+
 
 def check(cond, msg):
     global checks
@@ -85,6 +97,15 @@ with sync_playwright() as p:
         # F1 is deliberately code-free: it is the "no software required" module.
         if slug != "f01":
             check(page.locator("figure.code").count() >= 1, "%s has code" % slug)
+        # The highlighter must not change a single character of the code.
+        want = source_code_blocks(slug)
+        got = page.eval_on_selector_all(
+            "figure.code code[class^='lang-']", "els => els.map(e => e.textContent)")
+        check(len(got) == len(want),
+              "%s: %d code blocks in source, %d in the DOM" % (slug, len(want), len(got)))
+        for i, (w, g) in enumerate(zip(want, got)):
+            check(w == g, "%s code block %d was altered by highlighting\n"
+                          "      source: %r\n      shown : %r" % (slug, i, w[:90], g[:90]))
         # widgets that declared themselves must have rendered a body with content
         for w in page.locator(".widget[data-widget]").all():
             name = w.get_attribute("data-widget")
