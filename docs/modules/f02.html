@@ -55,8 +55,19 @@
 <figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">mkdir agents-course
 cd agents-course</code></pre></figure>
 <p><code>mkdir</code> makes a directory (a folder). <code>cd</code> means "change directory" — go into it. You are now working inside that folder.</p>
-<p>Now create a file called <code>hello.py</code>. Use any text editor: TextEdit, Notepad, or better, install <a href="https://code.visualstudio.com/">VS Code</a>, which is free and made for this. Put this in the file and save it <strong>in the <code>agents-course</code> folder</strong> you just made:</p>
+<p>Now you need a file called <code>hello.py</code> <strong>inside that folder</strong>. Make it from the terminal, so there is no doubt about where it landed:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">touch hello.py</code></pre></figure>
+<p>On Windows PowerShell that command is <code>New-Item hello.py</code> instead.</p>
+<p>Now open it in an editor. The one worth installing is <a href="https://code.visualstudio.com/">VS Code</a> — free, and made for exactly this. Install it, then from your terminal:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">code .</code></pre></figure>
+<p>The <code>.</code> means "this folder". VS Code opens with <code>hello.py</code> in the sidebar; click it. (If <code>code</code> is not recognised, open VS Code normally and use File → Open Folder.)</p>
+<p>If you would rather not install anything yet, every system already has an editor:</p>
+<ul><li><strong>Mac</strong> — <code>open -e hello.py</code>. In TextEdit, choose Format → Make Plain Text first.</li><li><strong>Windows</strong> — <code>notepad hello.py</code>.</li><li><strong>Linux</strong> — <code>nano hello.py</code>. Type, then Ctrl+O and Enter to save, Ctrl+X to quit.</li></ul>
+<p>Type this one line into the file and save it:</p>
 <figure class="code" data-lang="python"><div class="code-title">hello.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">print(&quot;Hello. I am a program.&quot;)</code></pre></figure>
+<aside class="callout c-warn"><h4>Check the file is really called hello.py</h4><div class="callout-body"><p>Two editors will quietly rename your file, and this is the single most common reason step 3 fails.</p>
+<p>Notepad appends <code>.txt</code> unless you set "Save as type" to "All Files", so you end up with <code>hello.py.txt</code>. TextEdit saves rich text unless you did Format → Make Plain Text.</p>
+<p>Run <code>ls</code> (Mac/Linux) or <code>dir</code> (Windows) and look at the name. If it is anything other than exactly <code>hello.py</code>, rename it — <code>mv hello.py.txt hello.py</code> on Mac/Linux, <code>ren hello.py.txt hello.py</code> on Windows.</p></div></aside>
 <p>Back in the terminal, run it:</p>
 <figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 hello.py</code></pre></figure>
 <p>You should see:</p>
