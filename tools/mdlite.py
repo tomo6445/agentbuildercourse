@@ -171,6 +171,22 @@ class Renderer:
 
         inner = "\n".join(self._blocks(body, 0, len(body)))
 
+        if name == "deeper":
+            summary = title.strip() or "Go deeper (optional)"
+            out.append(
+                '<details class="deeper"><summary>%s</summary>'
+                '<div class="deeper-body">%s</div></details>' % (summary, inner)
+            )
+            return i
+
+        if name == "jargon":
+            term = title.strip()
+            out.append(
+                '<aside class="jargon"><h4>%s</h4><div class="callout-body">%s</div>'
+                '</aside>' % (term, inner)
+            )
+            return i
+
         if name == "objectives":
             heading = title.strip() or "By the end of this module you can"
             out.append(

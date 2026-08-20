@@ -35,7 +35,7 @@ with sync_playwright() as p:
     # ---- hub ----
     page.goto(BASE + "/index.html")
     page.wait_for_timeout(400)
-    check(page.locator(".card").count() == 16, "hub should render 16 cards, got %d" % page.locator(".card").count())
+    check(page.locator(".card").count() == 20, "hub should render 20 cards, got %d" % page.locator(".card").count())
     check(page.locator(".stage").count() == 7, "capstone stages")
     check(page.locator(".pillar").count() == 3, "pillars")
 
@@ -51,17 +51,17 @@ with sync_playwright() as p:
     page.click("#corebtn")
     page.wait_for_timeout(200)
     core = page.locator(".card:not(.hidden)").count()
-    check(core == 14, "core path should show 14 modules, got %d" % core)
+    check(core == 18, "core path should show 18 modules, got %d" % core)
     page.click("#corebtn")
     page.wait_for_timeout(150)
 
     # progress persistence
     page.locator(".card[data-n='M1'] .tick").click()
     page.wait_for_timeout(200)
-    check("1 / 16" in page.inner_text("#ptext"), "progress text after tick: %s" % page.inner_text("#ptext"))
+    check("1 / 20" in page.inner_text("#ptext"), "progress text after tick: %s" % page.inner_text("#ptext"))
     page.reload()
     page.wait_for_timeout(400)
-    check("1 / 16" in page.inner_text("#ptext"), "progress should persist across reload")
+    check("1 / 20" in page.inner_text("#ptext"), "progress should persist across reload")
     check(page.locator(".card[data-n='M1']").get_attribute("class").find("done") >= 0, "M1 marked done after reload")
 
     # theme toggle
@@ -72,8 +72,8 @@ with sync_playwright() as p:
 
     # ---- every lesson page ----
     WIDGETS = {}
-    for i in range(1, 17):
-        slug = "m%02d" % i
+    slugs = ["f%02d" % i for i in range(1, 5)] + ["m%02d" % i for i in range(1, 17)]
+    for slug in slugs:
         page.goto("%s/modules/%s.html" % (BASE, slug))
         page.wait_for_timeout(350)
         check(page.locator("article.lesson h2").count() >= 4,
@@ -82,7 +82,9 @@ with sync_playwright() as p:
         check(page.locator("#quiz .q").count() == 5, "%s should have 5 quiz questions, got %d"
               % (slug, page.locator("#quiz .q").count()))
         check(page.locator(".objectives li").count() >= 4, "%s objectives" % slug)
-        check(page.locator("figure.code").count() >= 1, "%s has code" % slug)
+        # F1 is deliberately code-free: it is the "no software required" module.
+        if slug != "f01":
+            check(page.locator("figure.code").count() >= 1, "%s has code" % slug)
         # widgets that declared themselves must have rendered a body with content
         for w in page.locator(".widget[data-widget]").all():
             name = w.get_attribute("data-widget")
@@ -91,6 +93,19 @@ with sync_playwright() as p:
                   "%s widget %s has no head (did not initialise)" % (slug, name))
             check("not loaded" not in w.inner_text(), "%s widget %s not registered" % (slug, name))
             check("failed to start" not in w.inner_text(), "%s widget %s threw" % (slug, name))
+
+    # ---- beginner-track devices ----
+    page.goto(BASE + "/modules/f03.html")
+    page.wait_for_timeout(300)
+    check(page.locator("aside.jargon").count() >= 3, "f03 defines its terms in jargon boxes")
+    deeper = page.locator("details.deeper")
+    check(deeper.count() >= 1, "f03 carries optional depth")
+    check(not deeper.first.locator(".deeper-body").is_visible(),
+          "advanced depth must start collapsed for a beginner")
+    deeper.first.locator("summary").click()
+    page.wait_for_timeout(150)
+    check(deeper.first.locator(".deeper-body").is_visible(),
+          "clicking the summary must reveal the depth")
 
     # ---- quiz interaction on m01 ----
     page.goto(BASE + "/modules/m01.html")

@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F2 &middot; Your first program — Building AI Agents</title>
+<meta name="description" content="A program is a list of instructions in a file. You are about to write one and watch it run.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Foundations &middot; F2</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">F2</span><span class="pill core">core path</span><span class="pill">3.0 h</span><span class="pill">phase -1 &middot; Start here</span></div>
+  <h1>Your first program</h1>
+  <p class="line">A program is a list of instructions in a file. You are about to write one and watch it run.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#what-we-are-doing-and-why">What we are doing and why</a></li><li><a href="#step-1-open-a-terminal">Step 1 — open a terminal</a></li><li><a href="#step-2-install-python">Step 2 — install Python</a></li><li><a href="#step-3-your-first-program">Step 3 — your first program</a></li><li><a href="#step-4-variables">Step 4 — variables</a></li><li class="sub"><a href="#the-kinds-of-information-you-will-use">The kinds of information you will use</a></li><li><a href="#step-5-reading-errors">Step 5 — reading errors</a></li><li class="sub"><a href="#syntaxerror">SyntaxError</a></li><li class="sub"><a href="#nameerror">NameError</a></li><li class="sub"><a href="#filenotfounderror-or-cant-open-file">FileNotFoundError, or &quot;can&#x27;t open file&quot;</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Open a terminal on your machine and run a command in it</li><li>Install Python and confirm it worked</li><li>Write a program in a file and run it</li><li>Explain what a variable is and what it holds</li><li>Read an error message without panicking, and fix the three most common ones</li></ul></div>
+<h2 id="what-we-are-doing-and-why">What we are doing and why</h2>
+<p>A program is a list of instructions written in a file. You run the file, and the computer follows the instructions in order. That is the whole idea.</p>
+<p>By the end of this module you will have written one and watched it run. It will be small. That is fine — the agent you build in Module 1 is about sixty lines, and every one of them is made of the things you are about to learn.</p>
+<p>We use <strong>Python</strong>, because it reads more like English than most languages and because the tools for working with AI models are built for it.</p>
+<aside class="jargon"><h4>Terminal</h4><div class="callout-body"><p>A window where you type commands instead of clicking things. Also called the command line, the shell, the console, or the prompt. Same thing.</p>
+<p>It looks intimidating and is not. It does exactly one job: you type an instruction, press Enter, and it does the thing.</p></div></aside>
+<h2 id="step-1-open-a-terminal">Step 1 — open a terminal</h2>
+<p><strong>Mac:</strong> Press ⌘ + Space, type <code>Terminal</code>, press Enter.</p>
+<p><strong>Windows:</strong> Press the Start button, type <code>PowerShell</code>, press Enter.</p>
+<p><strong>Linux:</strong> Ctrl + Alt + T usually does it.</p>
+<p>You will see a window with some text and a blinking cursor. Type this and press Enter:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">echo hello</code></pre></figure>
+<p>It should print <code>hello</code>. That is you running a command. Nothing more mysterious than that is going to happen for the rest of this module.</p>
+<aside class="callout c-try"><h4>If nothing happened</h4><div class="callout-body"><p>Check you pressed Enter, and that you typed <code>echo hello</code> and not <code>echo &quot;hello</code> with a stray quote. The terminal is picky about exact characters and completely unforgiving about typos — that is normal and you will get used to it faster than you expect.</p></div></aside>
+<h2 id="step-2-install-python">Step 2 — install Python</h2>
+<p>First check whether you already have it. Type:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 --version</code></pre></figure>
+<p>If you see something like <code>Python 3.11.5</code>, you have it — skip to step 3. Any version starting with <code>3.10</code> or higher is fine.</p>
+<p>If you see an error, install it:</p>
+<ul><li><strong>Mac and Windows:</strong> go to <a href="https://www.python.org/downloads/">python.org/downloads</a>, download the installer, run it. <strong>On Windows, tick the box that says "Add Python to PATH"</strong> on the first screen — it is easy to miss and everything breaks without it.</li><li><strong>Linux:</strong> <code>sudo apt install python3</code> on Ubuntu or Debian.</li></ul>
+<p>Close the terminal, open a new one, and run <code>python3 --version</code> again. It should work now.</p>
+<aside class="jargon"><h4>PATH</h4><div class="callout-body"><p>A list your computer keeps of places to look for programs. When you type <code>python3</code>, your computer searches that list to find it.</p>
+<p>"Add Python to PATH" means "put Python somewhere I will look". If you skipped that box on Windows, the fix is to re-run the installer and tick it.</p></div></aside>
+<h2 id="step-3-your-first-program">Step 3 — your first program</h2>
+<p>Make a folder to work in. In the terminal:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">mkdir agents-course
+cd agents-course</code></pre></figure>
+<p><code>mkdir</code> makes a directory (a folder). <code>cd</code> means "change directory" — go into it. You are now working inside that folder.</p>
+<p>Now create a file called <code>hello.py</code>. Use any text editor: TextEdit, Notepad, or better, install <a href="https://code.visualstudio.com/">VS Code</a>, which is free and made for this. Put this in the file and save it <strong>in the <code>agents-course</code> folder</strong> you just made:</p>
+<figure class="code" data-lang="python"><div class="code-title">hello.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">print(&quot;Hello. I am a program.&quot;)</code></pre></figure>
+<p>Back in the terminal, run it:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 hello.py</code></pre></figure>
+<p>You should see:</p>
+<figure class="code" data-lang=""><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-">Hello. I am a program.</code></pre></figure>
+<p><strong>You have written and run a program.</strong> That is not a participation trophy — the loop you just completed (edit the file, run it, look at the output) is the loop you will be in for the rest of this course and, if you carry on, the rest of your programming life.</p>
+<aside class="jargon"><h4>print()</h4><div class="callout-body"><p>An instruction that displays something on screen. <code>print(&quot;hello&quot;)</code> shows <code>hello</code>.</p>
+<p>The round brackets hold what you want printed. The quote marks say "this is text, not an instruction". Both matter, and leaving one out is the most common beginner error there is.</p></div></aside>
+<h2 id="step-4-variables">Step 4 — variables</h2>
+<p>A variable is a name for a piece of information, so you can refer to it later.</p>
+<figure class="code" data-lang="python"><div class="code-title">greeting.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">name = &quot;Ada&quot;
+print(name)</code></pre></figure>
+<p>Run it and you get <code>Ada</code>.</p>
+<p>Read the first line as: <em>"let the name <code>name</code> refer to the text <code>Ada</code>"</em>. The <code>=</code> here does <strong>not</strong> mean "equals" in the mathematical sense. It means "put this thing under this name". This trips people up for about a day and then never again.</p>
+<p>Now something more useful:</p>
+<figure class="code" data-lang="python"><div class="code-title">greeting.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">name = &quot;Ada&quot;
+greeting = &quot;Hello, &quot; + name + &quot;. Welcome.&quot;
+print(greeting)</code></pre></figure>
+<p>That prints <code>Hello, Ada. Welcome.</code> The <code>+</code> joins pieces of text together. Change <code>&quot;Ada&quot;</code> to your own name, save, and run it again. <strong>Actually do this</strong> — changing a program and seeing the output change is the moment this stops being abstract.</p>
+<h3 id="the-kinds-of-information-you-will-use">The kinds of information you will use</h3>
+<p>Python distinguishes between a few types of thing, and mixing them up causes a lot of early errors:</p>
+<div class="table-wrap"><table><thead><tr><th>Type</th><th>What it is</th><th>Examples</th></tr></thead><tbody><tr><td><strong>string</strong></td><td>Text. Always in quote marks.</td><td><code>&quot;hello&quot;</code>, <code>&quot;Ada&quot;</code>, <code>&quot;42&quot;</code></td></tr><tr><td><strong>integer</strong></td><td>A whole number. No quotes.</td><td><code>42</code>, <code>0</code>, <code>-7</code></td></tr><tr><td><strong>float</strong></td><td>A number with a decimal point.</td><td><code>3.14</code>, <code>0.5</code></td></tr><tr><td><strong>boolean</strong></td><td>True or false. Capital letter, no quotes.</td><td><code>True</code>, <code>False</code></td></tr></tbody></table></div>
+<p>The one that catches everyone: <code>&quot;42&quot;</code> and <code>42</code> are different things. The first is text that happens to look like a number; the second is a number you can do arithmetic with.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">print(2 + 2)         # 4        — arithmetic on numbers
+print(&quot;2&quot; + &quot;2&quot;)     # 22       — joining two pieces of text</code></pre></figure>
+<p>Neither is wrong. They are different operations, and Python did exactly what you asked.</p>
+<aside class="jargon"><h4>Comment</h4><div class="callout-body"><p>Anything after a <code>#</code> is ignored by the computer. It is a note for humans reading the code.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python"># This line does nothing at all
+print(&quot;This line runs&quot;)   # ...and this note is ignored too</code></pre></figure>
+<p>Good code is full of them. You will thank yourself in a month.</p></div></aside>
+<h2 id="step-5-reading-errors">Step 5 — reading errors</h2>
+<p>You will see errors constantly. Everyone does, at every level of experience. An error is not you failing — it is the computer telling you precisely what confused it, which is enormously more useful than it silently doing the wrong thing.</p>
+<p>Errors are read <strong>bottom-up</strong>. The last line is what went wrong; the lines above say where.</p>
+<p>Here are the three you will actually hit this week.</p>
+<h3 id="syntaxerror">SyntaxError</h3>
+<figure class="code" data-lang=""><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-">  File &quot;hello.py&quot;, line 1
+    print(&quot;Hello
+          ^
+SyntaxError: unterminated string literal</code></pre></figure>
+<p><strong>Means:</strong> you broke a rule of the language — usually a missing quote mark or bracket. <strong>Look at:</strong> the line number given, and the one before it. Count your quotes and brackets.</p>
+<h3 id="nameerror">NameError</h3>
+<figure class="code" data-lang=""><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-">NameError: name &#x27;nmae&#x27; is not defined</code></pre></figure>
+<p><strong>Means:</strong> you used a name Python has never seen. Almost always a typo, or using a variable before creating it. <strong>Look at:</strong> the spelling. <code>nmae</code> versus <code>name</code>.</p>
+<h3 id="filenotfounderror-or-cant-open-file">FileNotFoundError, or "can't open file"</h3>
+<figure class="code" data-lang=""><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-">python3: can&#x27;t open file &#x27;hello.py&#x27;: [Errno 2] No such file or directory</code></pre></figure>
+<p><strong>Means:</strong> you are not in the folder where your file lives. <strong>Fix:</strong> run <code>ls</code> (Mac/Linux) or <code>dir</code> (Windows) to see what is in the current folder. If <code>hello.py</code> is not listed, <code>cd</code> into the right folder.</p>
+<aside class="callout c-warn"><h4>The most valuable habit you can build today</h4><div class="callout-body"><p>When you hit an error, read it. Actually read it. The instinct is to feel a flash of alarm and start randomly changing things — everyone has it, and it costs hours.</p>
+<p>The error usually tells you the file, the line, and the problem. Nine times in ten the fix is sitting in the message.</p></div></aside>
+<details class="deeper"><summary>What "python3" is actually doing</summary><div class="deeper-body"><p>When you type <code>python3 hello.py</code>, you are running a program called <code>python3</code> and handing it your file. It reads your file top to bottom and carries out each instruction in order.</p>
+<p>Python is an <em>interpreted</em> language: it reads and executes as it goes, rather than being converted into machine instructions ahead of time. That is why you see errors when execution reaches the bad line, rather than before anything runs at all.</p>
+<p>You do not need this to continue. It is here because "what is actually happening when I press Enter" is a reasonable question, and the answer is not mysterious.</p></div></details>
+<aside class="callout c-lab"><h4>Lab F2 — get it running</h4><div class="callout-body"><p><code>labs/lab00_foundations</code> has a checker that confirms your setup works.</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 -m lab00_foundations.check f2</code></pre></figure>
+<p>It verifies your Python version, that you can create and run a file, and that you understand what a variable holds. It gives you plain-language feedback rather than a stack trace — that is the point of it.</p>
+<p>If you get stuck for more than twenty minutes on setup, that is a normal experience and not a sign you can't do this. Setup is the worst part of programming and it only happens once.</p></div></aside>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li>A terminal takes typed commands. <code>mkdir</code>, <code>cd</code>, <code>ls</code>/<code>dir</code>, <code>python3</code>.</li><li>A program is instructions in a file, run top to bottom.</li><li><code>print()</code> displays things.</li><li>A <strong>variable</strong> is a name for a piece of information; <code>=</code> means "put this under this name".</li><li>Text, whole numbers, decimals and true/false are different types, and <code>&quot;42&quot;</code> is not <code>42</code>.</li><li>Errors are read bottom-up and usually tell you the fix.</li></ul>
+<p>Next: making decisions and repeating things — including the loop that is the shape of every agent.</p>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Python installed, a file you wrote runs and prints what you expected, and you can explain what a variable holds.</p>
+<p style="margin-top:9px"><code>python3 -m lab00_foundations.check f2</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab00_foundations" style="margin-right:8px">lab00_foundations &#8599;</a>
+  <button class="btn" id="completebtn" data-module="F2">mark complete</button>
+</div>
+<nav class="prevnext"><a href="f01.html"><span class="dir">&#8592; previous</span><span class="t">F1 &middot; What a language model actually is</span></a><a class="next" href="f03.html"><span class="dir">next &#8594;</span><span class="t">F3 &middot; Decisions, repetition, and holding data</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "f02", "questions": [{"q": "What does <code>name = \"Ada\"</code> do?", "options": ["Checks whether name is equal to Ada", "Stores the text Ada under the name <code>name</code>, so you can refer to it later", "Creates a file called name", "Prints Ada to the screen"], "answer": 1, "why": "The <code>=</code> here is not the mathematical \"equals\" \u2014 it means \"put this thing under this name\". Nothing is displayed unless you also call <code>print()</code>. (Checking whether two things are equal uses <code>==</code>, which you meet in the next module.)"}, {"q": "What does <code>print(\"2\" + \"2\")</code> display?", "options": ["4", "22", "\"2\" + \"2\"", "An error"], "answer": 1, "why": "Quote marks make it text, and <code>+</code> on text joins it together \u2014 so you get <code>22</code>. Without the quotes, <code>2 + 2</code> is arithmetic on numbers and gives <code>4</code>. Neither is wrong; they are different operations, and confusing the two is one of the most common early errors."}, {"q": "You run your program and see <code>NameError: name 'grating' is not defined</code>. What is most likely wrong?", "options": ["Python is not installed properly", "You are in the wrong folder", "You misspelled a variable name, or used it before creating it", "You are missing a quote mark"], "answer": 2, "why": "A NameError means Python encountered a name it has never seen. It is nearly always a typo \u2014 <code>grating</code> where you meant <code>greeting</code> \u2014 or using a variable on a line before the line that creates it. A missing quote would be a SyntaxError instead."}, {"q": "<code>python3: can't open file 'hello.py'</code>. What is the fix?", "options": ["Reinstall Python", "Rename the file", "Change directory to the folder your file is in, and check it is listed there", "Run it as an administrator"], "answer": 2, "why": "The terminal looks for the file in whatever folder you are currently in. Run <code>ls</code> (Mac/Linux) or <code>dir</code> (Windows) to see what is there; if your file is not listed, <code>cd</code> into the folder where you saved it."}, {"q": "What is the single most useful habit when you hit an error?", "options": ["Undo your last change and try something else", "Read the error message \u2014 it usually names the file, the line, and the problem", "Restart the terminal", "Search the web for the error text before reading it"], "answer": 1, "why": "The instinct is a flash of alarm followed by randomly changing things, and it costs hours. Errors are read bottom-up: the last line says what went wrong, the lines above say where. Nine times in ten the fix is already in the message."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

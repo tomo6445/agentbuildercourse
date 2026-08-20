@@ -1,10 +1,15 @@
 # Building AI Agents
 
-**From first principles to production.** Sixteen modules for working developers.
-You write the agent loop by hand before you're allowed near a framework — then
-you learn to evaluate it, secure it, cost it, and ship it.
+**From zero to production.** Twenty modules, starting from no programming and no
+AI experience at all.
 
-Claude-first stack; transferable mechanics.
+Four foundation modules teach you what a language model actually is, get you
+writing and running code, and walk you through your first call to Claude. Then
+you build an AI agent by hand, and learn to test it, secure it, cost it, and
+ship it.
+
+Every technical term is defined the first time it appears. Each module carries
+an optional **Go deeper** section for readers who want the advanced material.
 
 **[Read the course →](https://tomo6445.github.io/agentbuildercourse/)**
 
@@ -34,11 +39,22 @@ pytest labs -q                # 187 tests, offline, no API key
 
 ## Start here
 
-1. Open `docs/index.html` and read **M1 — The Loop**.
-2. `cp labs/lab01_tinyagent/starter/tinyagent.py labs/lab01_tinyagent/tinyagent.py`
-3. `pytest labs/lab01_tinyagent -q` — twelve failures. Make them pass.
-4. `python -m lab01b_observatory.render --demo -o observatory.html` — the trace
-   viewer you'll extend for the next fifteen modules.
+**Never programmed before?** Start at **F1 — What a language model actually is**.
+It needs no software and no setup. Then work through F2–F4, which get you from
+"what is a terminal" to a working call to Claude.
+
+```bash
+python3 -m lab00_foundations.check f2     # F2, F3, F4 each have a checker
+```
+
+The checker gives plain-language feedback, never a stack trace.
+
+**Already code, and used an LLM API?** Skip to **M1 — The Loop**:
+
+```bash
+cp labs/lab01_tinyagent/starter/tinyagent.py labs/lab01_tinyagent/tinyagent.py
+pytest labs/lab01_tinyagent -q            # twelve failures. Make them pass.
+```
 
 ---
 
@@ -46,13 +62,15 @@ pytest labs -q                # 187 tests, offline, no API key
 
 | Phase | Modules | What it covers |
 |---|---|---|
+| **Foundations** | F1–F4 | What a model is, writing your first program, your first API call |
 | **0 · Mechanics** | M1–M3 | The loop, tool design, context — all by hand, no frameworks |
 | **1 · Building blocks** | M4–M6 | Choosing autonomy, the production harness, MCP |
 | **2 · Making agents good** | M7–M9 | Memory, evaluation, multi-agent |
 | **3 · Production** | M10–M13 | Observability, security, cost, the human interface |
 | **4 · Applied** | M14–M16 | Skills and packaging, eight domains, the capstone |
 
-52.5 hours. A 40-hour core path if you skip M13 and M15. Ten weeks as a cohort.
+63.5 hours. Skip Foundations if you already code and have used an LLM API.
+Fourteen weeks as a cohort.
 
 ## Three pillars
 

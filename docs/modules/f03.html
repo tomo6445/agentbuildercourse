@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F3 &middot; Decisions, repetition, and holding data — Building AI Agents</title>
+<meta name="description" content="Four ideas — if, loop, list, dictionary — and one of them is the shape of every agent you will ever build.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Foundations &middot; F3</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">F3</span><span class="pill core">core path</span><span class="pill">3.5 h</span><span class="pill">phase -1 &middot; Start here</span></div>
+  <h1>Decisions, repetition, and holding data</h1>
+  <p class="line">Four ideas — if, loop, list, dictionary — and one of them is the shape of every agent you will ever build.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#four-ideas">Four ideas</a></li><li><a href="#making-a-decision-if">Making a decision: if</a></li><li class="sub"><a href="#comparisons">Comparisons</a></li><li><a href="#repeating-loops">Repeating: loops</a></li><li class="sub"><a href="#going-through-a-list-of-things">Going through a list of things</a></li><li class="sub"><a href="#repeating-until-something-is-true">Repeating until something is true</a></li><li><a href="#holding-labelled-information-dictionaries">Holding labelled information: dictionaries</a></li><li><a href="#functions-naming-a-piece-of-work">Functions: naming a piece of work</a></li><li><a href="#putting-it-together">Putting it together</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Make a program choose between paths with if/else</li><li>Repeat work with a loop, and stop a loop on a condition</li><li>Hold a list of things, and go through it one at a time</li><li>Hold labelled information in a dictionary and look pieces of it up</li><li>Write a function that takes something in and gives something back</li><li>Recognise the <code>while</code> loop as the shape of every agent in this course</li></ul></div>
+<h2 id="four-ideas">Four ideas</h2>
+<p>Everything a program does is built from a handful of ideas. You met one already — storing information in a variable. Here are the rest, and then you have enough to read the agent in Module 1.</p>
+<p>The last one on this page is not a metaphor. The <code>while</code> loop you write in ten minutes is structurally the same as the agent loop you build in Module 1. That is why this module exists.</p>
+<h2 id="making-a-decision-if">Making a decision: if</h2>
+<figure class="code" data-lang="python"><div class="code-title">weather.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">temperature = 4
+
+if temperature &lt; 10:
+    print(&quot;Wear a coat.&quot;)
+else:
+    print(&quot;You&#x27;ll be fine.&quot;)</code></pre></figure>
+<p>Run it: <code>Wear a coat.</code> Change <code>4</code> to <code>20</code>, run it again: <code>You&#x27;ll be fine.</code></p>
+<p>Two things to notice, because both cause errors constantly:</p>
+<p><strong>The colon.</strong> <code>if temperature &lt; 10:</code> ends with <code>:</code>. Leave it out and you get a SyntaxError.</p>
+<p><strong>The indentation.</strong> The <code>print</code> lines are indented by four spaces. In Python, <strong>indentation is not decoration — it is how the language knows which lines belong to which block.</strong> Everything indented under the <code>if</code> runs when the condition is true. Get it wrong and the program does something different, or refuses to run.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">if temperature &lt; 10:
+print(&quot;Wear a coat.&quot;)        # IndentationError — Python cannot tell this belongs to the if</code></pre></figure>
+<h3 id="comparisons">Comparisons</h3>
+<div class="table-wrap"><table><thead><tr><th>You write</th><th>It means</th></tr></thead><tbody><tr><td><code>a == b</code></td><td>a is equal to b</td></tr><tr><td><code>a != b</code></td><td>a is not equal to b</td></tr><tr><td><code>a &lt; b</code></td><td>a is less than b</td></tr><tr><td><code>a &gt;= b</code></td><td>a is greater than or equal to b</td></tr><tr><td><code>a in b</code></td><td>a appears inside b</td></tr></tbody></table></div>
+<p>The one that bites everyone: <strong><code>=</code> stores a value, <code>==</code> compares two values.</strong> <code>x = 5</code> puts 5 into x. <code>x == 5</code> asks whether x is 5, and answers <code>True</code> or <code>False</code>.</p>
+<p>You can check more than one thing at once with <code>and</code> and <code>or</code>, and flip a check with <code>not</code>:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">if temperature &lt; 10 and raining:
+    print(&quot;Coat and umbrella.&quot;)</code></pre></figure>
+<h2 id="repeating-loops">Repeating: loops</h2>
+<h3 id="going-through-a-list-of-things">Going through a list of things</h3>
+<figure class="code" data-lang="python"><div class="code-title">cities.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">cities = [&quot;Oslo&quot;, &quot;Lisbon&quot;, &quot;Cairo&quot;]
+
+for city in cities:
+    print(&quot;Checking the weather in &quot; + city)</code></pre></figure>
+<p>Output:</p>
+<figure class="code" data-lang=""><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-">Checking the weather in Oslo
+Checking the weather in Lisbon
+Checking the weather in Cairo</code></pre></figure>
+<p>Read <code>for city in cities:</code> as <em>"take each thing in <code>cities</code>, call it <code>city</code>, and do the indented part"</em>. The name <code>city</code> is yours to choose — it just holds one item at a time.</p>
+<aside class="jargon"><h4>List</h4><div class="callout-body"><p>An ordered collection, written in square brackets: <code>[&quot;Oslo&quot;, &quot;Lisbon&quot;, &quot;Cairo&quot;]</code>.</p>
+<p>Lists can hold anything, and can grow:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">cities = []                   # start empty
+cities.append(&quot;Oslo&quot;)         # add to the end
+print(len(cities))            # 1 — len() gives the number of items
+print(cities[0])              # Oslo — position 0 is the FIRST item</code></pre></figure>
+<p>Counting from zero is normal in programming and feels wrong for about a week.</p></div></aside>
+<h3 id="repeating-until-something-is-true">Repeating until something is true</h3>
+<p>This is the important one.</p>
+<figure class="code" data-lang="python"><div class="code-title">countdown.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">count = 3
+
+while count &gt; 0:
+    print(count)
+    count = count - 1
+
+print(&quot;Go.&quot;)</code></pre></figure>
+<p>Output: <code>3</code>, <code>2</code>, <code>1</code>, <code>Go.</code></p>
+<p>Read <code>while count &gt; 0:</code> as <em>"as long as <code>count</code> is greater than zero, keep doing the indented part"</em>. Before each repetition Python re-checks the condition. When it becomes false, the loop ends and the program carries on below.</p>
+<p>The line <code>count = count - 1</code> looks strange if you read <code>=</code> as "equals" — it is not a mathematical claim, it is "take the current value of count, subtract one, and store the result back under <code>count</code>". Without it, <code>count</code> would stay at 3 forever and the loop would never end.</p>
+<aside class="callout c-warn"><h4>Infinite loops</h4><div class="callout-body"><p>If the condition never becomes false, the loop runs forever and your program hangs.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">count = 3
+while count &gt; 0:
+    print(count)          # nothing ever changes count — this never stops</code></pre></figure>
+<p><strong>Press Ctrl + C in the terminal to stop a runaway program.</strong> Learn that now; you will need it.</p>
+<p>Remember this feeling. In Module 1 you will discover that an AI agent is a <code>while</code> loop, that agents absolutely can fail to stop, and that Ctrl + C is not available when it is running on a server spending real money. Everything Module 1 says about turn caps and budget caps is this problem, grown up.</p></div></aside>
+<h2 id="holding-labelled-information-dictionaries">Holding labelled information: dictionaries</h2>
+<p>A list holds things in order. A <strong>dictionary</strong> holds things by label.</p>
+<figure class="code" data-lang="python"><div class="code-title">person.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">person = {
+    &quot;name&quot;: &quot;Ada&quot;,
+    &quot;city&quot;: &quot;London&quot;,
+    &quot;age&quot;: 36,
+}
+
+print(person[&quot;name&quot;])        # Ada
+print(person[&quot;age&quot;])         # 36</code></pre></figure>
+<p>The label is called a <strong>key</strong>; the thing it points at is the <strong>value</strong>. You look things up by key rather than by position, which is far easier to read than remembering that position 2 was the age.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">person[&quot;job&quot;] = &quot;engineer&quot;        # add a new pair
+print(len(person))                # 4
+print(&quot;city&quot; in person)           # True — is there a key called city?</code></pre></figure>
+<p>Dictionaries matter enormously for the rest of this course, because <strong>this is the shape of the messages you send to Claude.</strong> In Module F4 you will write exactly this:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;What&#x27;s the weather in Oslo?&quot;}</code></pre></figure>
+<p>A dictionary with two keys. You already understand it.</p>
+<aside class="jargon"><h4>Nesting</h4><div class="callout-body"><p>Lists and dictionaries can hold each other, to any depth. This looks alarming and is just the two ideas combined:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">conversation = [
+    {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello&quot;},
+    {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;Hi there&quot;},
+]
+
+print(conversation[0][&quot;content&quot;])     # Hello</code></pre></figure>
+<p>Read it left to right: take <code>conversation</code>, take item <code>0</code> (the first), take the value under <code>content</code>. That is the entire trick, and that structure is the conversation you send to Claude on every single call.</p></div></aside>
+<h2 id="functions-naming-a-piece-of-work">Functions: naming a piece of work</h2>
+<p>A function is a chunk of instructions with a name, so you can use it repeatedly without writing it out again.</p>
+<figure class="code" data-lang="python"><div class="code-title">greet.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def greet(name):
+    message = &quot;Hello, &quot; + name + &quot;.&quot;
+    return message
+
+print(greet(&quot;Ada&quot;))          # Hello, Ada.
+print(greet(&quot;Grace&quot;))        # Hello, Grace.</code></pre></figure>
+<ul><li><code>def</code> starts a definition. <code>greet</code> is the name you chose.</li><li><code>name</code> in the brackets is the <strong>parameter</strong> — information handed in when the function is used.</li><li><code>return</code> sends a result back out.</li><li>The indented lines are the body. They do not run when you define it; they run when you <em>call</em> it.</li></ul>
+<p><strong>Defining is not calling.</strong> <code>def greet(name):</code> creates the function. <code>greet(&quot;Ada&quot;)</code> runs it. A function you define and never call does nothing at all — a genuinely common source of "why is nothing happening".</p>
+<p>A function can take several parameters, and can have defaults:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def describe(city, country=&quot;unknown&quot;):
+    return city + &quot; is in &quot; + country
+
+print(describe(&quot;Oslo&quot;, &quot;Norway&quot;))    # Oslo is in Norway
+print(describe(&quot;Atlantis&quot;))          # Atlantis is in unknown</code></pre></figure>
+<details class="deeper"><summary>Why bother with functions at all</summary><div class="deeper-body"><p>Three reasons, and they compound.</p>
+<p><strong>You write it once.</strong> Change the greeting in one place rather than in forty.</p>
+<p><strong>You can name the idea.</strong> <code>calculate_cost_of_turn(...)</code> says what is happening. Ten lines of arithmetic in the middle of a loop does not.</p>
+<p><strong>You can test it in isolation.</strong> Later in the course, every ship gate is a test that calls one function with known inputs and checks what comes back. That is only possible because the work lives in a function with a clear way in and a clear way out.</p>
+<p>When you read the agent in Module 1, notice that the tool-executing part is its own function. That is not an accident — it is what lets you check it separately from the loop around it.</p></div></details>
+<h2 id="putting-it-together">Putting it together</h2>
+<p>This program has every idea on the page, and is a recognisable skeleton of what you build next module:</p>
+<figure class="code" data-lang="python"><div class="code-title">budget.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">def cost_of(tokens, price_per_thousand):
+    &quot;&quot;&quot;Work out what a number of tokens costs.&quot;&quot;&quot;
+    return (tokens / 1000) * price_per_thousand
+
+
+calls = [
+    {&quot;name&quot;: &quot;first question&quot;, &quot;tokens&quot;: 620},
+    {&quot;name&quot;: &quot;follow-up&quot;, &quot;tokens&quot;: 1450},
+    {&quot;name&quot;: &quot;final answer&quot;, &quot;tokens&quot;: 2300},
+]
+
+total = 0.0
+budget = 0.01
+
+for call in calls:
+    price = cost_of(call[&quot;tokens&quot;], 0.003)
+    total = total + price
+    print(call[&quot;name&quot;] + &quot; cost &quot; + str(round(price, 5)))
+
+    if total &gt; budget:
+        print(&quot;Stopping: over budget.&quot;)
+        break
+
+print(&quot;Total: &quot; + str(round(total, 5)))</code></pre></figure>
+<p>Everything in there is something you now know: a function with a return value, a list of dictionaries, a loop over that list, a lookup by key, an if that checks a condition, and <code>break</code> to leave a loop early.</p>
+<aside class="jargon"><h4>str() and round()</h4><div class="callout-body"><p><code>str(0.0069)</code> turns a number into text, so it can be joined onto other text with <code>+</code>. Without it you get <code>TypeError: can only concatenate str to str</code> — a very common early error.</p>
+<p><code>round(0.006933, 5)</code> shortens a decimal to five places.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab F3 — write the four shapes</h4><div class="callout-body"><figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 -m lab00_foundations.check f3</code></pre></figure>
+<p>You write four small programs: a decision, a <code>for</code> loop over a list, a <code>while</code> loop that stops on a condition, and a function that returns something built from its input. The checker tells you in plain language what is missing rather than showing you a stack trace.</p>
+<p>The <code>while</code> loop is the one that matters. Look at it when you finish, then look at Module 1's agent loop. They are the same shape.</p></div></aside>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li><strong><code>if</code> / <code>else</code></strong> chooses a path. The colon and the indentation are both load-bearing.</li><li><strong><code>==</code> compares; <code>=</code> stores.</strong></li><li><strong><code>for</code></strong> goes through a collection; <strong><code>while</code></strong> repeats until a condition goes false.</li><li>An infinite loop is a real failure mode. Ctrl + C stops one.</li><li><strong>Lists</strong> hold things in order (counting from 0); <strong>dictionaries</strong> hold things by key.</li><li><strong>Functions</strong> name a piece of work, take inputs, and return results.</li></ul>
+<p>Next: your first call to Claude from a program you wrote.</p>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Write a loop that keeps going until a condition is met, and a function that takes an input and returns something built from it.</p>
+<p style="margin-top:9px"><code>python3 -m lab00_foundations.check f3</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab00_foundations" style="margin-right:8px">lab00_foundations &#8599;</a>
+  <button class="btn" id="completebtn" data-module="F3">mark complete</button>
+</div>
+<nav class="prevnext"><a href="f02.html"><span class="dir">&#8592; previous</span><span class="t">F2 &middot; Your first program</span></a><a class="next" href="f04.html"><span class="dir">next &#8594;</span><span class="t">F4 &middot; Talking to Claude from your own code</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "f03", "questions": [{"q": "What is the difference between <code>=</code> and <code>==</code>?", "options": ["No difference; both work", "<code>=</code> stores a value under a name; <code>==</code> asks whether two things are equal", "<code>=</code> is for numbers, <code>==</code> is for text", "<code>==</code> is an older style"], "answer": 1, "why": "<code>x = 5</code> puts 5 into x. <code>x == 5</code> asks whether x is 5 and answers True or False. Using <code>=</code> where you meant <code>==</code> inside an <code>if</code> is one of the most common early bugs."}, {"q": "Why does this loop never end?<br><code>count = 3</code><br><code>while count > 0:</code><br>&nbsp;&nbsp;&nbsp;&nbsp;<code>print(count)</code>", "options": ["<code>while</code> loops always run forever", "The condition is wrong", "Nothing inside the loop ever changes <code>count</code>, so the condition stays true", "<code>print</code> cannot be used in a loop"], "answer": 2, "why": "The condition is re-checked before each repetition, but <code>count</code> never changes, so it is always greater than zero. It needs something like <code>count = count - 1</code> inside. Ctrl + C stops a runaway program \u2014 and this exact failure mode, grown up, is why agents need turn caps and budget caps."}, {"q": "Given <code>person = {\"name\": \"Ada\", \"age\": 36}</code>, how do you get the age?", "options": ["<code>person[1]</code>", "<code>person[\"age\"]</code>", "<code>person.age()</code>", "<code>age(person)</code>"], "answer": 1, "why": "Dictionaries are looked up by key, in square brackets, with the key written exactly as it appears \u2014 including the quote marks. Position numbers like <code>person[1]</code> are for lists, where things are held in order rather than by label."}, {"q": "You define a function <code>def greet(name):</code> and run your program, but nothing is printed. What is the most likely reason?", "options": ["Functions cannot print", "You defined the function but never called it", "The function needs a different name", "You must use <code>return</code> instead of <code>print</code>"], "answer": 1, "why": "Defining a function creates it; the indented body does not run until you <em>call</em> it with <code>greet(\"Ada\")</code>. A function that is defined and never called does nothing at all."}, {"q": "Given <code>conversation = [{\"role\": \"user\", \"content\": \"Hello\"}]</code>, what does <code>conversation[0][\"content\"]</code> give you?", "options": ["\"role\"", "\"user\"", "\"Hello\"", "An error"], "answer": 2, "why": "Read it left to right: take <code>conversation</code>, take item 0 (the first), then take the value stored under the key <code>content</code> \u2014 which is \"Hello\". That nested shape, a list of dictionaries, is exactly the conversation you send to Claude on every call."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

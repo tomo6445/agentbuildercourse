@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F1 &middot; What a language model actually is — Building AI Agents</title>
+<meta name="description" content="It predicts the next piece of text. Everything surprising about it follows from that, in both directions.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Foundations &middot; F1</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">F1</span><span class="pill core">core path</span><span class="pill">2.0 h</span><span class="pill">phase -1 &middot; Start here</span></div>
+  <h1>What a language model actually is</h1>
+  <p class="line">It predicts the next piece of text. Everything surprising about it follows from that, in both directions.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#you-need-no-preparation-for-this-module">You need no preparation for this module</a></li><li><a href="#the-one-sentence-version">The one-sentence version</a></li><li><a href="#tokens-the-unit-of-everything">Tokens: the unit of everything</a></li><li><a href="#what-the-model-can-see-and-what-it-cannot">What the model can see, and what it cannot</a></li><li><a href="#why-it-makes-things-up">Why it makes things up</a></li><li><a href="#the-model-versus-the-product">The model versus the product</a></li><li><a href="#try-this-before-moving-on">Try this before moving on</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Say what a language model does, in one sentence, without using jargon</li><li>Explain what a token is and why it is the thing you get billed for</li><li>Describe what the model can and cannot see when it answers you</li><li>Say why a model can write working code and still invent a library that does not exist</li><li>Recognise the difference between the model and the product wrapped around it</li></ul></div>
+<h2 id="you-need-no-preparation-for-this-module">You need no preparation for this module</h2>
+<p>No software to install. No code to write. Nothing to sign up for. Read this, answer the questions at the end, and you will understand the thing everything else in the course is built on.</p>
+<p>The next module gets you writing code. This one makes sure you know what you are writing code <em>for</em>.</p>
+<h2 id="the-one-sentence-version">The one-sentence version</h2>
+<p>A language model reads some text and predicts what text should come next.</p>
+<p>That is genuinely it. Everything else — the helpfulness, the code, the analysis, the occasional confident nonsense — comes out of that single ability, applied at enormous scale.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>It predicts the next piece of text. Everything surprising about it follows from that, in both directions.</p></div></aside>
+<p>It is worth sitting with how strange that is. Nobody programmed the model with rules about Python syntax or French grammar or how to write a polite refusal. It was shown an enormous quantity of text and trained to predict what comes next, over and over. The capabilities we care about turned out to be <em>consequences</em> of getting very good at that.</p>
+<p>This explains the two things beginners find most confusing:</p>
+<p><strong>Why is it so capable?</strong> Because predicting the next word well, across billions of examples, requires actually modelling a great deal about how the world and language work. To finish the sentence "The capital of Norway is ___" you need to know something.</p>
+<p><strong>Why does it confidently say false things?</strong> Because it is producing text that <em>looks like</em> what should come next — and plausible-looking text is not the same thing as true text. We will come back to this, because it matters enormously once the model can take actions.</p>
+<h2 id="tokens-the-unit-of-everything">Tokens: the unit of everything</h2>
+<p>A model does not read letters or words. It reads <strong>tokens</strong>.</p>
+<aside class="jargon"><h4>Token</h4><div class="callout-body"><p>A token is a chunk of text — very roughly ¾ of a word in English. Common words are usually one token each. Longer or unusual words get split into several.</p>
+<p>"The cat sat on the mat" is about 6 tokens. "Antidisestablishmentarianism" is about 7 tokens on its own.</p>
+<p>You will see this word constantly for the rest of the course. It is the unit models read in, write out, and — importantly — the unit you are <strong>charged</strong> for.</p></div></aside>
+<p>Three practical consequences, and you should hold on to all three:</p>
+<p><strong>You pay per token, in both directions.</strong> Text you send in costs money. Text the model writes back costs money, usually several times more per token. When we start counting costs in Module 12, this is the arithmetic.</p>
+<p><strong>There is a limit to how much it can hold at once.</strong> This is the <em>context window</em>.</p>
+<p><strong>Everything is text.</strong> The document you paste, the instructions you give, the reply it writes — all the same kind of stuff, all tokens. This sounds like a technicality. It becomes a security problem in Module 11, and it is the single most important thing on this page.</p>
+<aside class="jargon"><h4>Context window</h4><div class="callout-body"><p>The maximum number of tokens the model can consider at one time — everything you sent it plus everything it writes back. Current Claude models can hold roughly a million tokens, which is a very large book.</p>
+<p>Think of it as the model's desk, not its memory. Whatever is on the desk right now is what it can work with.</p></div></aside>
+<h2 id="what-the-model-can-see-and-what-it-cannot">What the model can see, and what it cannot</h2>
+<p>This trips up nearly everyone, so let us be precise.</p>
+<p>When you send a message, the model sees <strong>exactly what you sent it, and nothing else.</strong> It does not remember your last conversation. It cannot look at your files. It has no idea what happened yesterday. It is not connected to anything.</p>
+<p>"But it remembered what I said earlier in the chat!" It did — because the chat application quietly re-sent the whole conversation with your new message. Every single time. The model did not remember; the software around it re-reminded it.</p>
+<p>That is worth restating, because the entire course depends on it:</p>
+<aside class="callout c-warn"><h4>The model is stateless</h4><div class="callout-body"><p>Each call starts from nothing. Any sense of memory, continuity or ongoing work is created by the software around the model re-sending the relevant history every time.</p>
+<p>When you build an agent, <strong>you</strong> are that software. Deciding what to re-send is your job, and it turns out to be one of the hardest and most expensive decisions you will make. That is Module 3.</p></div></aside>
+<h2 id="why-it-makes-things-up">Why it makes things up</h2>
+<p>The model produces text that looks like what should come next. Usually, text that looks right <em>is</em> right — that is why it works at all. But the mechanism does not have a step where it checks whether something is true.</p>
+<p>So when you ask about something obscure, or something that does not exist, you often do not get "I don't know". You get a confident, well-formed, completely fabricated answer — because a confident well-formed answer is what <em>looks like</em> what comes next.</p>
+<p>The classic version, which you will hit personally within a week of writing code:</p>
+<blockquote><p>You ask for code that solves a problem. It writes something clean and sensible that imports a library called <code>easyparse</code>. The code is well-structured. The function names are good. The library does not exist and never has.</p></blockquote>
+<p>This is not the model being broken. It is the model doing exactly what it does — producing plausible text — in a case where plausible and true came apart.</p>
+<p><strong>What follows from this, practically:</strong></p>
+<ul><li>Anything factual and important gets checked. Always.</li><li>Prefer designs where the model <em>looks something up</em> rather than recalls it. This is a large part of why agents exist at all, and it is Module 2.</li><li>The confidence in the writing tells you nothing about the accuracy of the content. Nothing. A fabricated answer and a correct one are written in exactly the same tone.</li></ul>
+<details class="deeper"><summary>Why "hallucination" is a slightly misleading word</summary><div class="deeper-body"><p>The term suggests a malfunction — the model glitching. It is closer to the opposite: the model is working precisely as designed, and the design has no truth-checking step in it.</p>
+<p>A more useful frame is that the model is always doing the same thing, and the question is whether the plausible continuation happens to be accurate. For well-covered topics it almost always is. For obscure ones it often is not, and the model has no internal signal telling it which situation it is in.</p>
+<p>This is why the fix is architectural rather than a matter of asking more nicely. You give the model a way to check, and you verify the important things yourself.</p></div></details>
+<h2 id="the-model-versus-the-product">The model versus the product</h2>
+<p>One more distinction, because the vocabulary is genuinely confusing.</p>
+<p><strong>The model</strong> is the thing that predicts text. On its own it does nothing at all — it cannot browse, remember, run code or send email.</p>
+<p><strong>The product</strong> is the software wrapped around it. When you use Claude in a browser, you are using a product: it manages the conversation, re-sends history, may search the web, renders the output nicely.</p>
+<p><strong>An agent</strong> — the thing this whole course is about — is another kind of software wrapped around the model. It gives the model a way to request actions, performs those actions, and feeds the results back. That loop is Module 1, and by the end of Phase 0 you will have built one yourself.</p>
+<aside class="jargon"><h4>Prompt</h4><div class="callout-body"><p>The text you send to the model. That is all it means.</p>
+<p>You will hear "prompt engineering" used as though it were arcane. It mostly means: being specific, giving examples, and saying what you actually want. It matters, and it is not mystical.</p></div></aside>
+<h2 id="try-this-before-moving-on">Try this before moving on</h2>
+<p>Genuinely do this — twenty minutes, and it will make the next three modules land much better. Open Claude (or any chat assistant) in your browser and try all four:</p>
+<ol><li><strong>Ask something it knows well.</strong> "Explain how a bicycle gear changes work." Note how good it is.</li><li><strong>Ask something obscure and checkable.</strong> A detail about a small local business, a minor historical figure, a specific page of a specific book. Then check it. Notice the tone is identical whether it is right or wrong.</li><li><strong>Ask it what you said three messages ago.</strong> It will tell you. Now remember that it only knows because the app re-sent the whole conversation.</li><li><strong>Ask it something it cannot possibly know</strong> — what is on your desk, what time it is where you are. Watch what it does with a question it has no access to answer.</li></ol>
+<p>Those four experiments are the whole of this module, in a form you cannot forget.</p>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li>A language model predicts what text comes next. Everything follows from that.</li><li>It reads and writes <strong>tokens</strong>, which is what you are billed for.</li><li>It has a <strong>context window</strong> — a desk, not a memory.</li><li>It is <strong>stateless</strong>. Continuity is created by software re-sending history.</li><li>It produces plausible text, and plausible is not the same as true.</li><li>The model, the product, and an agent are three different things.</li></ul>
+<p>Next: you write your first program. No prior experience assumed.</p>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>Explain in your own words why a model can write a working function and still invent a library that does not exist.</p>
+<p style="margin-top:9px"><code>no setup required — read and answer the knowledge check</code></p></div></div>
+
+<div class="complete-bar">
+  <p></p>
+  
+  <button class="btn" id="completebtn" data-module="F1">mark complete</button>
+</div>
+<nav class="prevnext"><a href="../index.html"><span class="dir">&#8592; back</span><span class="t">Course index</span></a><a class="next" href="f02.html"><span class="dir">next &#8594;</span><span class="t">F2 &middot; Your first program</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "f01", "questions": [{"q": "You have a long conversation with a chat assistant. It refers back to something you said twenty messages ago. What actually happened?", "options": ["The model stored your earlier messages in its memory", "The application re-sent the earlier conversation along with your new message", "The model looked up your account history", "The model was retrained on your conversation"], "answer": 1, "why": "The model is stateless \u2014 each call starts from nothing. Any sense of continuity is created by the software around it re-sending the relevant history every single time. When you build an agent, you become that software, and deciding what to re-send is one of your hardest decisions."}, {"q": "A model writes you a clean, well-structured Python function that imports a library which does not exist. What does this tell you?", "options": ["The model is malfunctioning and should be restarted", "The model was trained on bad data", "It produced text that looks like what should come next, and in this case plausible and true came apart", "The library used to exist and was removed"], "answer": 2, "why": "This is the mechanism working exactly as designed. There is no step in it that checks whether something is true \u2014 it produces plausible continuations. Usually plausible text is also accurate, which is why it works at all. The fix is architectural: give the model a way to look things up, and verify what matters."}, {"q": "Roughly how much text is a token?", "options": ["One letter", "About three quarters of a word in English", "One sentence", "One paragraph"], "answer": 1, "why": "Roughly \u00be of a word, though it varies \u2014 common words are usually one token, unusual ones get split into several. It matters because tokens are the unit the model reads, the unit it writes, and the unit you are charged for."}, {"q": "Which of these can a language model do entirely on its own, with no software wrapped around it?", "options": ["Search the web for current information", "Remember your previous conversation", "Produce text in response to text", "Run code and tell you the result"], "answer": 2, "why": "On its own the model only turns text into text. Searching, remembering and running code are all things the surrounding software does \u2014 and an agent is precisely that surrounding software, built to let the model request actions and then feed the results back."}, {"q": "The model answers a question about an obscure topic in a confident, fluent, well-organised way. What can you conclude about its accuracy?", "options": ["It is probably accurate \u2014 confidence reflects certainty", "Nothing at all; correct and fabricated answers are written in the same tone", "It is probably wrong, since the topic is obscure", "It would have said so if it were unsure"], "answer": 1, "why": "Tone carries no information about accuracy here. A fabricated answer and a correct one are produced by the same process and read identically. This is exactly why anything factual and important gets checked, and why designs that let the model look things up beat designs that rely on recall."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

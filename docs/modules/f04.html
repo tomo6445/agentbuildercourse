@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F4 &middot; Talking to Claude from your own code — Building AI Agents</title>
+<meta name="description" content="An API is a way for your program to ask another computer a question. This is your first one.">
+<link rel="stylesheet" href="../assets/course.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9679;</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="lessonbar"><div class="lessonbar-in">
+  <a class="home" href="../index.html">&#8592; all modules</a>
+  <span class="crumb">Foundations &middot; F4</span>
+  <button class="iconbtn" id="themebtn" style="margin-left:auto">dark</button>
+  <div class="readbar"></div>
+</div></div>
+
+<header class="lesson-head">
+  <div class="meta"><span class="pill">F4</span><span class="pill core">core path</span><span class="pill">2.5 h</span><span class="pill">phase -1 &middot; Start here</span></div>
+  <h1>Talking to Claude from your own code</h1>
+  <p class="line">An API is a way for your program to ask another computer a question. This is your first one.</p>
+</header>
+
+<div class="lesson-layout">
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#what-an-api-is">What an API is</a></li><li><a href="#json-the-format-things-travel-in">JSON: the format things travel in</a></li><li><a href="#getting-a-key">Getting a key</a></li><li><a href="#storing-the-key-properly">Storing the key properly</a></li><li><a href="#installing-the-library">Installing the library</a></li><li><a href="#your-first-call">Your first call</a></li><li class="sub"><a href="#what-every-line-does">What every line does</a></li><li><a href="#what-comes-back">What comes back</a></li><li><a href="#what-that-cost">What that cost</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
+<article class="lesson" id="main">
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Explain what an API is, in plain language, and why your program needs one</li><li>Read JSON and see that it is the lists and dictionaries you already know</li><li>Get an API key and store it without putting it in your code</li><li>Send a message to Claude from a program you wrote, and print the reply</li><li>Read the usage figures and work out what the call cost</li></ul></div>
+<h2 id="what-an-api-is">What an API is</h2>
+<p>Your program runs on your machine. Claude runs on Anthropic's computers. An <strong>API</strong> is the arrangement that lets one talk to the other.</p>
+<aside class="jargon"><h4>API</h4><div class="callout-body"><p>Application Programming Interface. A way for one program to ask another program to do something.</p>
+<p>The useful mental picture is ordering at a counter. You do not go into the kitchen. There is a menu of things you may ask for, a fixed way of asking, and something comes back. The API is the counter, the menu, and the rules about how to order.</p></div></aside>
+<p>For our purposes, calling an API means: your program sends some text over the internet, another computer does something with it, and sends text back. That is all that is happening in this module.</p>
+<h2 id="json-the-format-things-travel-in">JSON: the format things travel in</h2>
+<p>Programs on different machines, possibly written in different languages, need an agreed way to write information down. The agreed way is <strong>JSON</strong>.</p>
+<p>Here is some:</p>
+<figure class="code" data-lang="json"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-json">{
+  &quot;role&quot;: &quot;user&quot;,
+  &quot;content&quot;: &quot;What is the capital of Norway?&quot;
+}</code></pre></figure>
+<p>You have seen this before. That is a dictionary — curly braces, keys, values. And this:</p>
+<figure class="code" data-lang="json"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-json">[
+  {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Hello&quot;},
+  {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;Hi there&quot;}
+]</code></pre></figure>
+<p>is a list of dictionaries, exactly as in the last module.</p>
+<aside class="jargon"><h4>JSON</h4><div class="callout-body"><p>JavaScript Object Notation. A text format for structured information, built from the same pieces you already know: labelled collections (like dictionaries), ordered collections (like lists), text, numbers, and true/false.</p>
+<p>You do not have to write JSON by hand here. You write Python dictionaries and lists; the library converts them. It matters only because when you look at what actually crossed the wire — which you will do constantly from Module 1 onwards — this is what you are looking at.</p></div></aside>
+<h2 id="getting-a-key">Getting a key</h2>
+<p>To use the API you need an <strong>API key</strong>: a long secret string that identifies your account and gets you billed.</p>
+<ol><li>Go to <a href="https://console.anthropic.com">console.anthropic.com</a> and make an account.</li><li>Add a small amount of credit. <strong>Five dollars is more than enough for this entire course</strong> — the exercises here cost pennies.</li><li>Find <strong>API keys</strong> in the settings and create one. It looks like <code>sk-ant-</code> followed by a long string.</li><li><strong>Copy it now.</strong> You are shown it once.</li></ol>
+<aside class="callout c-warn"><h4>Treat the key like a password</h4><div class="callout-body"><p>Anyone with your key can spend your money.</p>
+<p><strong>Never put it directly in your code.</strong> Not even temporarily, not even in a file you think is private. The reason is boring and universal: code gets copied, pasted into chats, shared for help, and committed to GitHub — and keys leaked this way are found by automated scanners within minutes.</p>
+<p>We are about to do it the correct way, and the correct way is barely more work.</p></div></aside>
+<h2 id="storing-the-key-properly">Storing the key properly</h2>
+<p>We put the key in the <strong>environment</strong> — a set of named values your programs can read, which live outside your code.</p>
+<p><strong>Mac / Linux</strong>, in the terminal:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">export ANTHROPIC_API_KEY=&quot;sk-ant-paste-yours-here&quot;</code></pre></figure>
+<p><strong>Windows PowerShell</strong>:</p>
+<figure class="code" data-lang="powershell"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-powershell">$env:ANTHROPIC_API_KEY=&quot;sk-ant-paste-yours-here&quot;</code></pre></figure>
+<p>Check it worked:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">echo $ANTHROPIC_API_KEY</code></pre></figure>
+<aside class="callout c-try"><h4>This only lasts until you close the terminal</h4><div class="callout-body"><p>That is deliberate — nothing was written to disk. When you open a new terminal you set it again.</p>
+<p>To make it permanent on Mac/Linux, add the same <code>export</code> line to the file <code>~/.zshrc</code> (or <code>~/.bashrc</code>), then open a new terminal. On Windows, search for "environment variables" in the Start menu and add it there.</p></div></aside>
+<h2 id="installing-the-library">Installing the library</h2>
+<p>A <strong>library</strong> is code somebody else wrote that you can use. Anthropic publishes one for talking to Claude:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">pip install anthropic</code></pre></figure>
+<p><code>pip</code> is Python's installer. If <code>pip</code> is not found, try <code>pip3</code> or <code>python3 -m pip install anthropic</code>.</p>
+<h2 id="your-first-call">Your first call</h2>
+<p>Create <code>first_call.py</code>:</p>
+<figure class="code" data-lang="python"><div class="code-title">first_call.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">import anthropic
+
+# Creates the object that talks to the API.
+# It finds your key in the environment automatically — you never type it here.
+client = anthropic.Anthropic()
+
+response = client.messages.create(
+    model=&quot;claude-opus-5&quot;,
+    max_tokens=1000,
+    messages=[
+        {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;What is the capital of Norway? Answer in one sentence.&quot;}
+    ],
+)
+
+print(response.content[0].text)</code></pre></figure>
+<p>Run it:</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 first_call.py</code></pre></figure>
+<p>You should get a sentence about Oslo. <strong>You have just written a program that talks to an AI model.</strong></p>
+<h3 id="what-every-line-does">What every line does</h3>
+<p><strong><code>import anthropic</code></strong> — makes the library available. Like <code>print</code>, but it came from outside.</p>
+<p><strong><code>client = anthropic.Anthropic()</code></strong> — creates the thing that does the talking, and stores it under the name <code>client</code>. It looks for <code>ANTHROPIC_API_KEY</code> in the environment by itself.</p>
+<p><strong><code>client.messages.create(...)</code></strong> — the actual call. The dot means "the <code>messages</code> part of <code>client</code>, and the <code>create</code> action of that". Everything inside the brackets is what you are asking for:</p>
+<ul><li><strong><code>model=&quot;claude-opus-5&quot;</code></strong> — which model. Different models cost different amounts and vary in capability.</li><li><strong><code>max_tokens=1000</code></strong> — the most tokens the model may write back. A safety limit: it stops a runaway reply costing you a fortune.</li><li><strong><code>messages=[...]</code></strong> — the conversation. A list of dictionaries, exactly the shape from Module F3. <code>&quot;role&quot;: &quot;user&quot;</code> means this came from you.</li></ul>
+<p><strong><code>response.content[0].text</code></strong> — digging the text out of the reply, which we will look at now.</p>
+<h2 id="what-comes-back">What comes back</h2>
+<p>The reply is not a piece of text. It is a structured object with several parts, and understanding its shape now will save you real confusion in Module 1.</p>
+<figure class="code" data-lang="python"><div class="code-title">inspect_reply.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">import anthropic
+
+client = anthropic.Anthropic()
+response = client.messages.create(
+    model=&quot;claude-opus-5&quot;,
+    max_tokens=1000,
+    messages=[{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Name three Norwegian cities.&quot;}],
+)
+
+print(&quot;stop reason:&quot;, response.stop_reason)
+print(&quot;blocks:     &quot;, len(response.content))
+print(&quot;block type: &quot;, response.content[0].type)
+print(&quot;text:       &quot;, response.content[0].text)
+print(&quot;tokens in:  &quot;, response.usage.input_tokens)
+print(&quot;tokens out: &quot;, response.usage.output_tokens)</code></pre></figure>
+<p><strong><code>response.content</code> is a list</strong>, which is why you write <code>content[0]</code> to get the first item. Right now there is only one thing in it. In Module 1 there will be several, and one of them will be the model asking you to run a tool — so getting used to it being a list is worth doing today.</p>
+<p><strong><code>response.stop_reason</code></strong> tells you why it stopped. <code>end_turn</code> means it finished naturally. <code>max_tokens</code> means it hit your limit mid-sentence — the answer is cut off, and treating that as a complete reply is a real bug you will meet again.</p>
+<p><strong><code>response.usage</code></strong> is what you were charged for.</p>
+<h2 id="what-that-cost">What that cost</h2>
+<p>Prices are per million tokens and change, so check the current rates on Anthropic's pricing page and put them in one place:</p>
+<figure class="code" data-lang="python"><div class="code-title">cost.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python"># Per million tokens. Check current published rates before trusting these.
+PRICE_IN = 5.00
+PRICE_OUT = 25.00
+
+def cost_of(usage):
+    &quot;&quot;&quot;Return the dollar cost of one call.&quot;&quot;&quot;
+    return (usage.input_tokens * PRICE_IN
+            + usage.output_tokens * PRICE_OUT) / 1_000_000
+
+print(&quot;this call cost $&quot; + str(round(cost_of(response.usage), 6)))</code></pre></figure>
+<p>A short question like the one above costs a tiny fraction of a cent. Two things to notice now, because both become important:</p>
+<p><strong>Output costs several times more than input</strong> per token.</p>
+<p><strong>Input grows as a conversation goes on.</strong> Every turn re-sends everything before it. In Module 12 you will find this is the dominant cost in nearly every agent, and that it grows with the <em>square</em> of the number of turns.</p>
+<details class="deeper"><summary>Having a conversation, and seeing statelessness for yourself</summary><div class="deeper-body"><p>The model has no memory. To have a back-and-forth, you re-send the whole conversation each time — which you can watch happening:</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">messages = [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;My name is Ada.&quot;}]
+
+first = client.messages.create(model=&quot;claude-opus-5&quot;, max_tokens=1000, messages=messages)
+print(first.content[0].text)
+
+# Add the reply, then your follow-up, then send the WHOLE list again.
+messages.append({&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: first.content[0].text})
+messages.append({&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;What is my name?&quot;})
+
+second = client.messages.create(model=&quot;claude-opus-5&quot;, max_tokens=1000, messages=messages)
+print(second.content[0].text)
+print(&quot;input tokens, call 1:&quot;, first.usage.input_tokens)
+print(&quot;input tokens, call 2:&quot;, second.usage.input_tokens)</code></pre></figure>
+<p>It knows your name on the second call — because you sent it again. Delete the two <code>append</code> lines and it will not.</p>
+<p>Watch the two input-token numbers. The second is larger, and it will keep growing every turn. That is the whole of Module 3 and most of Module 12, visible in a six-line program.</p></div></details>
+<aside class="callout c-warn"><h4>Things that commonly go wrong here</h4><div class="callout-body"><p><strong><code>AuthenticationError</code></strong> — the key is not set, or the terminal running the script is not the one you set it in. Run <code>echo $ANTHROPIC_API_KEY</code> in the <em>same</em> window.</p>
+<p><strong><code>ModuleNotFoundError: No module named &#x27;anthropic&#x27;</code></strong> — the library is not installed, or is installed for a different Python. Try <code>python3 -m pip install anthropic</code>.</p>
+<p><strong><code>RateLimitError</code></strong> — too many requests too quickly. Wait a moment. Module 12 is about handling this properly, and doing it badly is how a small blip becomes an outage.</p>
+<p><strong>A bill larger than you expected</strong> — check <code>max_tokens</code>, and check you are not looping. Set a spending limit in the console; it is one click and worth doing today.</p></div></aside>
+<aside class="callout c-lab"><h4>Lab F4 — your first call</h4><div class="callout-body"><figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 -m lab00_foundations.check f4</code></pre></figure>
+<p>Confirms your key is set, the library is installed, and a script you wrote sends a message, prints the reply, and reports the cost. It runs one real API call costing a fraction of a cent.</p>
+<p>If you would rather not spend anything yet, <code>--offline</code> runs the same checks against a fake model, so you can confirm your code is right before spending a penny.</p></div></aside>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li>An <strong>API</strong> lets your program ask another computer to do something.</li><li><strong>JSON</strong> is a text format built from the lists and dictionaries you already know.</li><li>An <strong>API key</strong> identifies and bills you. It lives in the environment, never in your code.</li><li><code>client.messages.create(...)</code> sends a conversation and returns a structured reply.</li><li><strong><code>response.content</code> is a list</strong>; <code>stop_reason</code> says why it stopped; <code>usage</code> is what you paid.</li><li>Conversations work by <strong>re-sending everything</strong>, and that is where the cost lives.</li></ul>
+<p>That is the foundation. Next: Module 1, where you take this single call and put it in a loop — and that loop is an AI agent.</p>
+<h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
+<div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>A script you wrote sends a message to Claude, prints the reply, and reports what the call cost.</p>
+<p style="margin-top:9px"><code>python3 -m lab00_foundations.check f4</code></p></div></div>
+
+<div class="complete-bar">
+  <p>Lab code for this module lives in the repository:</p>
+  <a class="btn ghost" href="https://github.com/tomo6445/agentbuildercourse/blob/main/labs/lab00_foundations" style="margin-right:8px">lab00_foundations &#8599;</a>
+  <button class="btn" id="completebtn" data-module="F4">mark complete</button>
+</div>
+<nav class="prevnext"><a href="f03.html"><span class="dir">&#8592; previous</span><span class="t">F3 &middot; Decisions, repetition, and holding data</span></a><a class="next" href="m01.html"><span class="dir">next &#8594;</span><span class="t">M1 &middot; The Loop: what an agent actually is</span></a></nav>
+</article>
+</div>
+
+<footer>
+  Building AI Agents &middot; v1.0 &middot; <a href="../index.html">course index</a> &middot;
+  <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
+  Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
+</footer>
+<script>window.QUIZ={"id": "f04", "questions": [{"q": "Why should an API key never be written directly in your code?", "options": ["It makes the program run more slowly", "Code gets copied, shared and committed to GitHub, and leaked keys are found by automated scanners within minutes", "The library cannot read keys from code", "Keys expire when saved in a file"], "answer": 1, "why": "Anyone with your key can spend your money. The risk is not exotic \u2014 code gets pasted into chats for help and pushed to public repositories, and scanners find leaked keys almost immediately. Putting it in the environment keeps it out of every file you might share."}, {"q": "Why is <code>response.content</code> a list rather than just a piece of text?", "options": ["For historical reasons; it always has exactly one item", "Because a reply can contain several parts \u2014 and from Module 1, one of them is the model requesting a tool", "So you can send several messages at once", "Because lists are faster than text"], "answer": 1, "why": "A single reply can carry several content blocks. Right now there is one piece of text, so <code>content[0].text</code> works \u2014 but writing code that assumes exactly one item breaks the moment the model starts requesting tools, which is the whole of Module 1."}, {"q": "A reply comes back with <code>stop_reason</code> of <code>max_tokens</code>. What does that mean?", "options": ["The model finished its answer normally", "Your input was too long", "The reply was cut off at your limit and is incomplete", "You have run out of credit"], "answer": 2, "why": "<code>max_tokens</code> is the ceiling you set on the reply's length, and hitting it stops the model mid-answer. Treating that truncated reply as a finished answer is a genuine bug \u2014 Module 1 has a test specifically for it."}, {"q": "You send a second message and the model remembers your name from the first. Why?", "options": ["The API stores your conversation between calls", "Because your program sent the earlier messages again as part of the second call", "The model learned your name", "The API key links the two calls together"], "answer": 1, "why": "The model is stateless \u2014 each call starts from nothing. A conversation works because you append the reply and your follow-up to the messages list and re-send the whole thing. You can prove it by deleting the append lines: the memory vanishes."}, {"q": "Watching input tokens grow on every turn of a conversation matters because:", "options": ["Long conversations eventually fail", "You pay for those tokens again on every single turn, which becomes the dominant cost in most agents", "The model gets slower with more text", "It uses up your API key"], "answer": 1, "why": "Every turn re-sends everything before it, and you are billed for it every time. Across a long task this accumulates with the <em>square</em> of the turn count, not linearly \u2014 which is why Module 12 finds that reducing turns beats almost every other cost optimisation."}]};</script>
+<script src="../assets/widgets.js"></script>
+<script src="../assets/widgets-b.js"></script>
+<script src="../assets/course.js"></script>
+</body>
+</html>

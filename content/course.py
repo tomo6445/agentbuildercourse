@@ -10,14 +10,17 @@ COURSE = {
     "subtitle": "from first principles to production",
     "version": "v1.0",
     "standfirst": (
-        "Sixteen modules for working developers. You write the agent loop by hand before "
-        "you're allowed near a framework — then you learn to evaluate it, secure it, cost it, "
-        "and ship it. Claude-first stack; transferable mechanics."
+        "Start from zero. No programming experience, no AI experience, nothing assumed. "
+        "Four foundation modules teach you to write and run code and explain what a language "
+        "model actually is. Then you build an AI agent by hand, and learn to test it, secure "
+        "it, cost it, and ship it. Every term is defined the first time it appears."
     ),
-    "weeks": 10,
+    "weeks": 14,
 }
 
 PHASES = [
+    {"id": -1, "num": "Foundations", "name": "Start here",
+     "blurb": "You need three things before you can build an agent: an honest picture of what a language model is and is not, the ability to write and run a small program, and one working call to Claude from your own machine. That is all this phase does. If you already write code and have used an LLM API, skip to Phase 0."},
     {"id": 0, "num": "Phase 0", "name": "Mechanics",
      "blurb": "No frameworks. You build the loop, the tools, and the context strategy by hand, and you build the trace viewer that makes all of it visible. Everything later is measured against what you built here."},
     {"id": 1, "num": "Phase 1", "name": "Building blocks",
@@ -31,6 +34,42 @@ PHASES = [
 ]
 
 MODULES = [
+    {
+        "n": "F1", "phase": -1, "hrs": 2.0, "core": True,
+        "title": "What a language model actually is",
+        "line": "It predicts the next piece of text. Everything surprising about it follows from that, in both directions.",
+        "tags": ["no code", "tokens", "context window", "why it makes things up"],
+        "labs": [],
+        "gate": "Explain in your own words why a model can write a working function and still invent a library that does not exist.",
+        "gate_cmd": "no setup required — read and answer the knowledge check",
+    },
+    {
+        "n": "F2", "phase": -1, "hrs": 3.0, "core": True,
+        "title": "Your first program",
+        "line": "A program is a list of instructions in a file. You are about to write one and watch it run.",
+        "tags": ["terminal", "installing Python", "variables", "print", "running a file"],
+        "labs": ["labs/lab00_foundations"],
+        "gate": "Python installed, a file you wrote runs and prints what you expected, and you can explain what a variable holds.",
+        "gate_cmd": "python3 -m lab00_foundations.check f2",
+    },
+    {
+        "n": "F3", "phase": -1, "hrs": 3.5, "core": True,
+        "title": "Decisions, repetition, and holding data",
+        "line": "Four ideas — if, loop, list, dictionary — and one of them is the shape of every agent you will ever build.",
+        "tags": ["if/else", "loops", "lists", "dictionaries", "functions"],
+        "labs": ["labs/lab00_foundations"],
+        "gate": "Write a loop that keeps going until a condition is met, and a function that takes an input and returns something built from it.",
+        "gate_cmd": "python3 -m lab00_foundations.check f3",
+    },
+    {
+        "n": "F4", "phase": -1, "hrs": 2.5, "core": True,
+        "title": "Talking to Claude from your own code",
+        "line": "An API is a way for your program to ask another computer a question. This is your first one.",
+        "tags": ["what an API is", "JSON", "API keys", "your first call", "cost"],
+        "labs": ["labs/lab00_foundations"],
+        "gate": "A script you wrote sends a message to Claude, prints the reply, and reports what the call cost.",
+        "gate_cmd": "python3 -m lab00_foundations.check f4",
+    },
     {
         "n": "M1", "phase": 0, "hrs": 2.5, "core": True,
         "title": "The Loop: what an agent actually is",
@@ -212,5 +251,5 @@ def module_by_n(n):
 
 
 def slug_for(m):
-    """m01 … m16 — the on-disk name for a module's content and page."""
-    return "m%02d" % int(m["n"][1:])
+    """f01…f04 and m01…m16 — the on-disk name for a module's content and page."""
+    return "%s%02d" % (m["n"][0].lower(), int(m["n"][1:]))

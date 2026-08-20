@@ -471,3 +471,43 @@ figure.code:has(.code-title) .copy{top:32px}
   .lesson-layout{grid-template-columns:1fr}
   body{background:#fff}
 }
+
+/* ==========================================================================
+   Beginner track: optional depth, and plain-language term boxes
+   ========================================================================== */
+details.deeper{
+  margin:24px 0;border:1px solid var(--rule);border-left:3px solid var(--ink-3);
+  background:var(--paper-2);font-family:var(--sans);font-size:14px;
+}
+details.deeper > summary{
+  cursor:pointer;padding:11px 15px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);
+  list-style:none;user-select:none;
+}
+details.deeper > summary::-webkit-details-marker{display:none}
+details.deeper > summary::before{content:"▸ ";color:var(--ink-3)}
+details.deeper[open] > summary::before{content:"▾ "}
+details.deeper > summary:hover{color:var(--rust)}
+details.deeper[open] > summary{border-bottom:1px solid var(--rule)}
+.deeper-body{padding:14px 15px 4px}
+.deeper-body > *:first-child{margin-top:0}
+.deeper-body p,.deeper-body li{color:var(--ink-2)}
+.deeper-body figure.code{background:var(--paper)}
+
+aside.jargon{
+  margin:20px 0;padding:12px 15px;border:1px dashed var(--rule);
+  border-left:3px solid var(--teal);background:transparent;
+  font-family:var(--sans);font-size:14px;
+}
+aside.jargon h4{
+  font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--teal);margin:0 0 6px;font-weight:600;
+}
+aside.jargon p{margin:0 0 8px;color:var(--ink-2)}
+aside.jargon p:last-child{margin-bottom:0}
+aside.jargon code{font-size:.85em}
+
+/* Foundations phase reads as a distinct on-ramp rather than another module */
+.phase[data-phase="-1"] .phase-num{color:var(--teal)}
+.tag.t-found{background:var(--teal-soft);border-color:var(--teal);color:var(--teal)}
+.pill.found{background:var(--teal-soft);border-color:var(--teal);color:var(--teal)}
