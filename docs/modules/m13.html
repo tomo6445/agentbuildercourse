@@ -74,7 +74,9 @@
 <p><strong>Pause</strong> should stop cleanly at the next turn boundary, keeping the state.</p>
 <p><strong>Steer</strong> should let someone inject a correction the agent picks up and continues from — "no, use the staging database" — without discarding twelve turns of context.</p>
 <p><strong>Rewind</strong> should let someone go back to turn 8 and take a different path. That is session forking (M5) with an interface on it.</p>
-<p>Design steering as an <strong>operator</strong> channel rather than an ordinary user message, so it carries more weight than the untrusted user turn and does not get confused with it.</p>
+<aside class="jargon"><h4>Operator channel</h4><div class="callout-body"><p>A way of sending instructions to a running agent that is distinguishable from ordinary user input, and carries more authority.</p>
+<p>It matters for two reasons. A correction from the person supervising the agent should outrank a sentence in a document it happens to be reading. And keeping the two apart is a security property: if steering arrived as an ordinary user message, anything that could inject text could steer the agent (M11).</p></div></aside>
+<p>Design steering as an operator channel rather than an ordinary user message, so it carries more weight than the untrusted user turn and cannot be confused with it.</p>
 <h2 id="showing-progress-honestly">Showing progress honestly</h2>
 <p>Agents break both assumptions a progress bar relies on: they do not know how many steps remain, and the steps are not the same size.</p>
 <p>What actually works:</p>

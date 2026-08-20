@@ -8,8 +8,10 @@ writing and running code, and walk you through your first call to Claude. Then
 you build an AI agent by hand, and learn to test it, secure it, cost it, and
 ship it.
 
-Every technical term is defined the first time it appears. Each module carries
-an optional **Go deeper** section for readers who want the advanced material.
+Every technical term is defined the first time it appears — 39 definition boxes
+across the twenty modules. Each module carries optional **Go deeper** sections
+holding the advanced material, collapsed by default so they never get in the
+way of a first read.
 
 **[Read the course →](https://tomo6445.github.io/agentbuildercourse/)**
 

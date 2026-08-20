@@ -28,10 +28,13 @@
 <article class="lesson" id="main">
 <div class="objectives"><h4>By the end of this module you can</h4><ul><li>Take one real problem through seven stages, in order, without skipping the uncomfortable ones</li><li>Write and commit the eval suite before the agent exists</li><li>Set a cost ceiling at stage 1 and enforce it in CI</li><li>Demonstrate graceful failure under a fault you did not choose</li><li>Absorb a mid-project scope change the way real projects require</li><li>Defend the design to a panel, including two questions you know are coming</li></ul></div>
 <h2 id="ship-one-real-thing">Ship one real thing</h2>
-<p>Everything so far has been scaffolded. Failing tests told you what to build; eval sets came pre-written; the security lab handed you the attacks. The capstone removes the scaffolding.</p>
-<p>You will build one agent for one real problem, over two weeks, and defend it.</p>
+<p>Everything so far has had scaffolding. Failing tests told you what to build. Test sets came pre-written. The security lab handed you the attacks.</p>
+<p>This removes the scaffolding. You build one agent, for one real problem, over two weeks, and then explain it to people who will ask hard questions.</p>
+<p>If you came in never having written code, look back at F2 for a moment. You are now being asked to design, build, test, secure and defend a production system. That is a genuine distance, and the capstone is where you find out you actually travelled it.</p>
 <aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>Two students can build the same agent and receive very different grades. Judgement is weighted highest.</p></div></aside>
-<p>That is not a warning about strictness. It is the actual grading criterion. An ambitious agent with a weak eval suite and an unexamined threat model scores below a modest agent whose author can say exactly what it does badly, why they chose this architecture, and what would change their mind. The Decision Log carries more weight than the demo.</p>
+<p>That is not a warning about strictness. It is the actual grading criterion.</p>
+<p>An ambitious agent with a weak test suite and an unexamined threat model scores <strong>below</strong> a modest one whose author can say exactly what it does badly, why they chose this design, and what would change their mind.</p>
+<p>Which is worth saying plainly to anyone who is new here: <strong>you are not being graded on how impressive the thing is.</strong> You are being graded on whether you know what you built.</p>
 <h2 id="the-seven-stages-in-order">The seven stages, in order</h2>
 <p>The order is enforced, and the enforcement is the point. Stage 2 before stage 4 is what separates this from every project that shipped a demo and discovered its failure modes in production.</p>
 <h3 id="01-problem-definition-10">01 · Problem definition — 10%</h3>
@@ -40,6 +43,9 @@
 <h3 id="02-eval-first-design-20">02 · Eval-first design — 20%</h3>
 <p><strong>Written and committed before a line of agent code exists.</strong> At least 30 cases across three tiers, outcome and trajectory assertions, a written judge rubric, and a validated judge — hand-label 30 outputs, measure kappa, iterate.</p>
 <p>The heaviest-weighted stage, deliberately. This is where projects live or die, and doing it first is the only way to find out that you cannot define success — which is much better to discover in week one than in week two.</p>
+<aside class="jargon"><h4>Decision Log</h4><div class="callout-body"><p>A short written record of each significant choice: what you decided, what else you considered, why you chose it, and <strong>what evidence would make you change your mind.</strong></p>
+<p>That last field is what makes it a decision log rather than a justification. A justification explains why you were right. A decision log tells the next person — often you, in three months — what would have made a different answer correct.</p>
+<p>This course has been asking for entries since M4. The capstone collects them.</p></div></aside>
 <h3 id="03-architecture-15">03 · Architecture — 15%</h3>
 <p>A diagram, plus Decision Log entries for: autonomy level (per action class, M13), tool design (M2), context strategy (M3), memory (M7), single versus multi-agent with the cost arithmetic (M9), and deployment shape (M15).</p>
 <p>Each entry states the decision, the alternatives, the reason, and what evidence would reverse it. That last field is what makes it a decision log rather than a justification.</p>
@@ -87,7 +93,8 @@ degrade (currently holds to turn 60 with 8-14 documents).</code></pre></figure>
 <h2 id="the-defence-panel">The defence panel</h2>
 <p>Two mandatory questions, known in advance, because knowing them in advance does not make them easier.</p>
 <p><strong>"What happens at 10× traffic?"</strong> Ten times the volume. Where does it break first — rate limits, cost, latency, a downstream dependency, the human review queue? What is the actual bottleneck, and what would you do? "It would probably be fine" is a failing answer; so is "I'd add more workers" without a number.</p>
-<p><strong>"How would this be attacked?"</strong> Walk the trifecta. What does it read that an attacker can influence? What can it reach? What would exfiltration look like, concretely, and what stops it? If your answer is that the model would refuse, you have not answered.</p>
+<p><strong>"How would this be attacked?"</strong> Walk M11's three capabilities. What does it read that somebody else could have written? What can it reach? What would stealing data look like, concretely, and what stops it?</p>
+<p>If your answer is "the model would refuse", you have not answered — that is a mitigation offered as a control, and it is the exact error M11 exists to prevent.</p>
 <p>Then whatever else the panel finds. The best defences are from students who already know their system's weakest point and say so before being asked.</p>
 <h2 id="grading">Grading</h2>
 <div class="table-wrap"><table><thead><tr><th>Dimension</th><th>Weight</th><th>What earns marks</th></tr></thead><tbody><tr><td>Problem fit</td><td>20%</td><td>The right amount of autonomy, defended with the M4 framework</td></tr><tr><td>Engineering quality</td><td>20%</td><td>Tools, context, errors, traces — the gates applied, not recited</td></tr><tr><td>Evaluation rigour</td><td>25%</td><td>Real cases, validated judge, trajectory assertions, CI</td></tr><tr><td>Security posture</td><td>20%</td><td>Threat model, hardening, honest residual risk</td></tr><tr><td>Decision Log judgement</td><td>15%</td><td>Reasoning, alternatives, and what would change your mind</td></tr></tbody></table></div>
@@ -97,6 +104,11 @@ degrade (currently holds to turn 60 with 8-14 documents).</code></pre></figure>
 <p>The most common failure in this room is not a broken agent. It is an author who cannot say what their agent is bad at.</p></div></aside>
 <aside class="callout c-lab"><h4>The whole thing</h4><div class="callout-body"><p><code>labs/lab16_capstone</code> contains the scaffold: the Decision Log template, the seven-stage checklist, the CI configuration with the cost gate, the threat-model template, and the brief bank if you do not have your own problem.</p>
 <p><code>python -m lab16_capstone.checklist</code> reports which stage artifacts exist and which gates pass — run it from day one, not day thirteen. It is deliberately a poor way to discover on day thirteen that stage 2 was never committed.</p></div></aside>
+<details class="deeper"><summary>If you are choosing your own problem</summary><div class="deeper-body"><p>The best capstone problems share three properties, and it is worth checking yours against them before day two rather than day nine.</p>
+<p><strong>You understand the domain.</strong> Not the agent part — the <em>work</em>. If you cannot say what a good answer looks like, you cannot write the test set, and stage 2 is 20% of the grade.</p>
+<p><strong>You can get real examples.</strong> Twenty actual cases, from actual usage. A problem where you would have to invent the test data is a problem where you will invent test data that flatters your agent (M8's autopsy).</p>
+<p><strong>It is small enough to finish and real enough to break.</strong> A toy fails in no interesting way and teaches nothing. Something ambitious runs out of time at stage 4 and never reaches hardening or instrumentation — which are 25% between them.</p>
+<p>A useful shape: one task, one kind of user, one integration, and genuine failure modes. "Reconcile our invoices against purchase orders" beats "an assistant for the finance team" every time.</p></div></details>
 <h2 id="where-to-go-next">Where to go next</h2>
 <p>You now have a spine: build the loop, see it, evaluate it, harden it, cost it, ship it. Three habits worth keeping:</p>
 <p><strong>Keep the Observatory.</strong> Every new agent gets traced from turn one. The habit of looking is the whole difference.</p>
