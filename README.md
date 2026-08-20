@@ -6,13 +6,18 @@ you learn to evaluate it, secure it, cost it, and ship it.
 
 Claude-first stack; transferable mechanics.
 
+**[Read the course →](https://tomo6445.github.io/agentbuildercourse/)**
+
 ---
 
 ## Two halves
 
 **The course site** — sixteen lesson pages with teaching prose, runnable code,
 knowledge checks, and thirteen interactive instruments. Static HTML, no build
-step to read it, works from a `file://` path.
+step to read it.
+
+Hosted at **<https://tomo6445.github.io/agentbuildercourse/>**, or run it
+locally — it works from a `file://` path with no server at all:
 
 ```bash
 open docs/index.html          # or: python3 -m http.server -d docs
@@ -82,6 +87,7 @@ labs/           sixteen lab packages + the shared agentcourse library
 python3 tools/build.py            # regenerate docs/ from content/
 python3 tools/build.py --check    # CI check: is docs/ stale?
 python3 tools/verify_site.py      # 136 browser checks over the built site
+python3 tools/verify_site.py --base https://tomo6445.github.io/agentbuildercourse
 pytest labs -q                    # every ship gate
 ```
 

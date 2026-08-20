@@ -1,8 +1,14 @@
 """Load every generated page in a real browser and assert it works."""
-import sys, pathlib
+import argparse, os, pathlib, sys
 from playwright.sync_api import sync_playwright
 
-ROOT = pathlib.Path("/home/user/agentbuildercourse/docs")
+_ap = argparse.ArgumentParser(description="Drive the built site in a real browser.")
+_ap.add_argument("--base", help="serve from this URL instead of local docs/ "
+                                "(e.g. https://user.github.io/repo)")
+_args = _ap.parse_args()
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent / "docs"
+BASE = _args.base.rstrip("/") if _args.base else "file://%s" % ROOT
 fails, checks = [], 0
 
 def check(cond, msg):
@@ -12,7 +18,14 @@ def check(cond, msg):
         fails.append(msg)
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(args=["--no-sandbox"], executable_path="/opt/pw-browsers/chromium-1194/chrome-linux/chrome")
+    # A remote --base needs the environment's proxy; Chromium does not read the
+    # env vars the way curl does, and the failure looks like ERR_CONNECTION_RESET.
+    launch = {"args": ["--no-sandbox"],
+              "executable_path": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"}
+    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    if _args.base and proxy:
+        launch["proxy"] = {"server": proxy}
+    browser = p.chromium.launch(**launch)
     page = browser.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -20,7 +33,7 @@ with sync_playwright() as p:
             if m.type == "error" else None)
 
     # ---- hub ----
-    page.goto("file://%s/index.html" % ROOT)
+    page.goto(BASE + "/index.html")
     page.wait_for_timeout(400)
     check(page.locator(".card").count() == 16, "hub should render 16 cards, got %d" % page.locator(".card").count())
     check(page.locator(".stage").count() == 7, "capstone stages")
@@ -61,7 +74,7 @@ with sync_playwright() as p:
     WIDGETS = {}
     for i in range(1, 17):
         slug = "m%02d" % i
-        page.goto("file://%s/modules/%s.html" % (ROOT, slug))
+        page.goto("%s/modules/%s.html" % (BASE, slug))
         page.wait_for_timeout(350)
         check(page.locator("article.lesson h2").count() >= 4,
               "%s should have several sections" % slug)
@@ -80,7 +93,7 @@ with sync_playwright() as p:
             check("failed to start" not in w.inner_text(), "%s widget %s threw" % (slug, name))
 
     # ---- quiz interaction on m01 ----
-    page.goto("file://%s/modules/m01.html" % ROOT)
+    page.goto(BASE + "/modules/m01.html")
     page.wait_for_timeout(300)
     page.locator("#quiz .q").first.locator(".opt").nth(1).click()   # correct answer for Q1
     page.wait_for_timeout(150)
@@ -102,7 +115,7 @@ with sync_playwright() as p:
           "M1 was already done from the hub, so this click should un-complete it")
 
     # ---- widget interaction: trifecta on m11 ----
-    page.goto("file://%s/modules/m11.html" % ROOT)
+    page.goto(BASE + "/modules/m11.html")
     page.wait_for_timeout(300)
     tri = page.locator(".widget[data-widget='trifecta']")
     for label in ["reads local files", "fetches web pages", "sends email"]:
@@ -111,7 +124,7 @@ with sync_playwright() as p:
     check("exfiltration primitive" in tri.inner_text().lower(), "trifecta detects all three legs")
 
     # ---- path traversal suite on m07 ----
-    page.goto("file://%s/modules/m07.html" % ROOT)
+    page.goto(BASE + "/modules/m07.html")
     page.wait_for_timeout(300)
     pt = page.locator(".widget[data-widget='path-traversal']")
     pt.locator("button:has-text('run the full attack suite')").click()
@@ -133,4 +146,4 @@ if fails:
     for f in fails:
         print("  - " + f)
     sys.exit(1)
-print("\nAll browser checks passed.")
+print("\nAll browser checks passed against %s" % BASE)
