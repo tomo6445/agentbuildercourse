@@ -24,93 +24,88 @@
 </header>
 
 <div class="lesson-layout">
-<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#the-least-observable-software-most-teams-have-shipped">The least observable software most teams have shipped</a></li><li><a href="#what-to-instrument">What to instrument</a></li><li><a href="#tracing-decisions-without-logging-conversations">Tracing decisions without logging conversations</a></li><li><a href="#the-failure-taxonomy">The failure taxonomy</a></li><li><a href="#replay-driven-debugging">Replay-driven debugging</a></li><li><a href="#alerting-on-agent-shaped-signals">Alerting on agent-shaped signals</a></li><li><a href="#further-reading">Further reading</a></li></ol></nav>
+<nav class="toc" aria-label="On this page"><h4>On this page</h4><ol><li><a href="#why-your-usual-logging-fails-here">Why your usual logging fails here</a></li><li><a href="#what-to-record">What to record</a></li><li><a href="#recording-behaviour-without-recording-conversations">Recording behaviour without recording conversations</a></li><li><a href="#seven-kinds-of-failure">Seven kinds of failure</a></li><li><a href="#debugging-by-branching">Debugging by branching</a></li><li><a href="#what-to-watch">What to watch</a></li><li><a href="#what-you-now-know">What you now know</a></li></ol></nav>
 <article class="lesson" id="main">
-<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Say why request logging fails for agents and what replaces it</li><li>Instrument the events that actually explain behaviour</li><li>Trace decision patterns without logging conversation contents</li><li>Recognise seven failure classes from their trace signatures</li><li>Debug by replay and session forking rather than by re-running and hoping</li><li>Alert on agent-shaped signals instead of HTTP status codes</li></ul></div>
-<h2 id="the-least-observable-software-most-teams-have-shipped">The least observable software most teams have shipped</h2>
-<p>Traditional observability assumes a request maps to a response, identical inputs produce identical outputs, and failure means an error. Agents violate all three.</p>
-<p><strong>The unit of interest is a decision, not a request.</strong> "Why did it call <code>delete_records</code>?" is not answered by any log line. It is answered by what was in context when that decision was made.</p>
-<p><strong>Failures are emergent across turns.</strong> The turn that looks wrong is often three turns downstream of the one that <em>was</em> wrong. A truncated tool result on turn 4 becomes a false answer on turn 7, and turn 7 is where the log looks strange.</p>
-<p><strong>Identical inputs legitimately diverge.</strong> Two runs of the same task taking different paths is normal. Your tooling must let you compare trajectories, not just diff outputs.</p>
-<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>You cannot debug what you cannot see. Agents are the least observable software most teams have shipped.</p></div></aside>
-<h2 id="what-to-instrument">What to instrument</h2>
-<p>Every one of these has earned its place by being the thing someone needed at 2am.</p>
-<div class="table-wrap"><table><thead><tr><th>Signal</th><th>What it answers</th></tr></thead><tbody><tr><td>Turn boundaries with stop reasons</td><td>Where did it stop, and why</td></tr><tr><td>Tool spans: name, args, duration, outcome</td><td>What did it actually do</td></tr><tr><td>Token counts by category</td><td>Where is the window going (M3)</td></tr><tr><td>Context occupancy per turn</td><td>Is it degrading, and from when</td></tr><tr><td>Cache metadata</td><td>Did the cache break silently (M3, M12)</td></tr><tr><td>Cost per turn and cumulative</td><td>Which runs are expensive, and where</td></tr><tr><td>Subagent spawn tree</td><td>Who delegated what, and what came back</td></tr><tr><td>Retries and their causes</td><td>Is a retry storm forming (M12)</td></tr><tr><td>Model and prompt version</td><td>Which change did this</td></tr></tbody></table></div>
-<p>That last row is the one people skip and then regret. When behaviour changes on Tuesday, "which prompt version was this run on" is the first question, and if the answer is not in the trace you are reconstructing it from git history and timestamps.</p>
-<figure class="code" data-lang="python"><div class="code-title">observability/otel.py</div><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">from opentelemetry import trace
+<div class="objectives"><h4>By the end of this module you can</h4><ul><li>Say why ordinary logging does not work for agents</li><li>Record the things that actually explain behaviour</li><li>Diagnose an agent without recording a word of the conversation</li><li>Recognise seven kinds of failure from what the record looks like</li><li>Debug by branching a saved run rather than re-running and hoping</li><li>Watch the signals that tell you an agent is unwell</li></ul></div>
+<h2 id="why-your-usual-logging-fails-here">Why your usual logging fails here</h2>
+<p>Normal software logging assumes three things: one request produces one response, the same input produces the same output, and failure means an error appears.</p>
+<p>Agents break all three.</p>
+<p><strong>What you care about is a decision, not a request.</strong> "Why did it call <code>delete_records</code>?" is not answered by any log line. It is answered by what was in the conversation at that moment.</p>
+<p><strong>Failures build up across turns.</strong> The turn that looks wrong is often several turns after the one that <em>was</em> wrong. A shortened tool result on turn 4 becomes a false answer on turn 7, and turn 7 is where the log looks odd.</p>
+<p><strong>Two identical runs legitimately differ.</strong> Your tooling has to let you compare two <em>routes</em>, not just two outputs.</p>
+<aside class="callout c-key"><h4>The idea in one line</h4><div class="callout-body"><p>You cannot debug what you cannot see. Agents are the least visible software most teams have shipped.</p></div></aside>
+<h2 id="what-to-record">What to record</h2>
+<p>You started this in M1 with a list of turn records. Here is what it grows into. Every row has earned its place by being the thing somebody needed at 2am.</p>
+<div class="table-wrap"><table><thead><tr><th>What</th><th>The question it answers</th></tr></thead><tbody><tr><td>Each turn and why it stopped</td><td>Where did it stop, and why</td></tr><tr><td>Each tool: name, arguments, duration, outcome</td><td>What did it actually do</td></tr><tr><td>Token counts</td><td>Where is the context going (M3)</td></tr><tr><td>Cache figures</td><td>Did caching quietly break (M3)</td></tr><tr><td>Cost per turn and running total</td><td>Which runs are expensive, and where</td></tr><tr><td>Which worker did what</td><td>Who delegated what, and what came back (M9)</td></tr><tr><td>Retries and why</td><td>Is a retry storm forming (M12)</td></tr><tr><td>Model and prompt version</td><td><strong>Which change caused this</strong></td></tr></tbody></table></div>
+<p>That last one gets skipped and then regretted. When behaviour changes on Tuesday, "which version of the instructions was this run on" is the first question, and reconstructing it from commit history and timestamps is miserable.</p>
+<h2 id="recording-behaviour-without-recording-conversations">Recording behaviour without recording conversations</h2>
+<p>This is the approach that gets past a security review, and it is much easier to build in from the start than to retrofit after somebody says no.</p>
+<p>Record the <strong>shape</strong> of what happened, not the contents:</p>
+<ul><li><strong>A fingerprint of the arguments</strong>, not the arguments. Two identical fingerprints on consecutive turns is your looping detector, and it reveals nothing about the data.</li><li><strong>Token counts</strong>, not text.</li><li><strong>Tool names, durations, outcomes, result sizes</strong> — none of which is customer data.</li><li><strong>Flags</strong> where you need them (<code>contained_personal_data: true</code>) rather than the content.</li></ul>
+<aside class="jargon"><h4>Fingerprint (hash)</h4><div class="callout-body"><p>A short string calculated from some data. The same data always gives the same fingerprint, and the data cannot be recovered from it.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">import hashlib, json
+
+def fingerprint(arguments):
+    text = json.dumps(arguments, sort_keys=True)
+    return hashlib.sha256(text.encode()).hexdigest()[:12]</code></pre></figure>
+<p><code>sort_keys=True</code> matters: without it, the same information written in a different order gives a different fingerprint, and your comparison silently stops working.</p></div></aside>
+<p>You can diagnose an enormous amount from that. Looping, cost blowouts, broken caching, drifting turn counts, tool error rates and silent shortening are all visible without a single sentence of conversation leaving the process.</p>
+<p>When you <em>do</em> need contents — and sometimes you do — make it deliberate: switched on for one specific run, short retention, restricted access, off by default.</p>
+<h2 id="seven-kinds-of-failure">Seven kinds of failure</h2>
+<p>Each leaves a recognisable trace. Learning to read these is most of what debugging an agent is.</p>
+<p><strong>Wrong tool chosen.</strong> Plausible but not right. <em>Looks like:</em> the tool ran fine, the result was irrelevant, the next turn tries something else. <em>Usually caused by:</em> tool descriptions (M2).</p>
+<p><strong>Bad arguments.</strong> Right tool, wrong values. <em>Looks like:</em> validation errors, or empty results from a query that should have matched. <em>Usually caused by:</em> missing parameter descriptions or missing enums.</p>
+<p><strong>Context degradation.</strong> Quality falls as the conversation grows. <em>Looks like:</em> accuracy dropping with turn number; early instructions stop being followed. <em>Cause:</em> M3.</p>
+<p><strong>Drift.</strong> It ends up doing a different, adjacent task. <em>Looks like:</em> tool arguments moving steadily away from the original topic, and a final answer on the wrong subject. <strong>No errors anywhere.</strong></p>
+<p><strong>Looping.</strong> <em>Looks like:</em> the same tool with the same arguments on alternating turns — identical fingerprints. Cheapest failure to detect, if you recorded the fingerprints.</p>
+<p><strong>Silent shortening.</strong> A tool returned part of the data with no marker. <em>Looks like:</em> a result sitting suspiciously exactly on a round number, followed by confident conclusions. The nastiest one, because nothing anywhere looks like an error.</p>
+<p><strong>Injection.</strong> Content it read contained instructions and it followed them. <em>Looks like:</em> a sudden change in behaviour right after fetching something, often with tool calls unrelated to the task (M11).</p>
+<div class="widget" data-widget="trace-reader" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
+<h2 id="debugging-by-branching">Debugging by branching</h2>
+<p>The highest-value technique in the course, and it takes a paragraph.</p>
+<p>When a run fails at turn 22, <strong>do not</strong> re-run the whole task and hope it fails the same way. Branch the saved run at turn 21 (M5), change exactly one thing, and run both.</p>
+<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">run abc123, failed at turn 22
+  ├── branch at 21, unchanged        -&gt; fails identically. So it is deterministic given that state.
+  ├── branch at 21, tool description rewritten -&gt; passes. Found it.
+  └── branch at 21, summarising turned off     -&gt; still fails. Not the summarising.</code></pre></figure>
+<p>Three branches, one cause, no statistics needed. Compare that with re-running a variable task thirty times to see whether a change helped.</p>
+<p>This is why M5 spent time on sessions, and why your records need to be complete enough to restart from. <strong>A record you cannot replay from is just a log.</strong></p>
+<h2 id="what-to-watch">What to watch</h2>
+<p>Server error rates and response times will not tell you an agent is unwell. These will.</p>
+<p><strong>Cost per task.</strong> The earliest signal of almost everything. Retry storms, context bloat, broken caching and looping all show up here first.</p>
+<p><strong>Tool error rate, per tool.</strong> One tool degrading is invisible in an overall rate and obvious per tool.</p>
+<p><strong>The shape of the turn-count distribution.</strong> Not the average — the <em>tail</em>. A growing tail means tasks are starting to thrash before finishing, and it shows up days before users complain.</p>
+<p><strong>Cache hit rate.</strong> A cliff means somebody put a timestamp in the instructions. Silent, expensive, trivial to detect if you are looking.</p>
+<p><strong>How often it declines or abstains.</strong> A sudden rise means something upstream changed — an edited prompt, a tool returning nonsense, a document store that stopped loading.</p>
+<p><strong>How often results were shortened.</strong> Count it explicitly. Silent shortening is invisible by definition unless your tools report it and you graph it.</p>
+<aside class="callout c-autopsy"><h4>The bug that only happened in production</h4><div class="callout-body"><p>An agent that passed every test and failed intermittently in production, about one run in twelve, never reproducibly. Locally it was clean.</p>
+<p>Comparing records found it. Successful and failing runs were identical except for the <em>order</em> of items in one tool's result. Under load the backing service returned rows in a different order, and the agent had learned — from that tool's description, which promised "most relevant first" — to rely on the first row.</p>
+<p>Nothing errored. No log line was wrong. It was found by comparing two records of the same task, which is only possible if you record enough to compare. The fix was one sentence in the description and an explicit sort — but the fix was never the hard part. Seeing it was.</p></div></aside>
+<details class="deeper"><summary>Using a standard format</summary><div class="deeper-body"><p>Rather than inventing your own, you can emit records in <strong>OpenTelemetry</strong> format — a widely-used standard for this kind of data, supported by most monitoring tools.</p>
+<figure class="code" data-lang="python"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-python">from opentelemetry import trace
 
 tracer = trace.get_tracer(&quot;agent&quot;)
 
+with tracer.start_as_current_span(&quot;agent.turn&quot;) as span:
+    span.set_attribute(&quot;agent.turn.index&quot;, turn_number)
+    span.set_attribute(&quot;agent.prompt.version&quot;, prompt_version)
 
-def traced_turn(index, request, call_model):
-    with tracer.start_as_current_span(&quot;agent.turn&quot;) as span:
-        span.set_attribute(&quot;agent.turn.index&quot;, index)
-        span.set_attribute(&quot;agent.context.tokens&quot;, request.estimated_tokens)
-        span.set_attribute(&quot;agent.prompt.version&quot;, request.prompt_version)
+    response = call_the_model(...)
 
-        response = call_model(request)
-
-        span.set_attribute(&quot;agent.stop_reason&quot;, response.stop_reason)
-        span.set_attribute(&quot;agent.tokens.input&quot;, response.usage.input_tokens)
-        span.set_attribute(&quot;agent.tokens.output&quot;, response.usage.output_tokens)
-        span.set_attribute(&quot;agent.tokens.cache_read&quot;, response.usage.cache_read_input_tokens)
-        span.set_attribute(&quot;agent.tools.requested&quot;,
-                           [b.name for b in response.content if b.type == &quot;tool_use&quot;])
-        return response
-
-
-def traced_tool(name, args, run):
-    with tracer.start_as_current_span(f&quot;tool.{name}&quot;) as span:
-        span.set_attribute(&quot;tool.name&quot;, name)
-        span.set_attribute(&quot;tool.args.hash&quot;, stable_hash(args))   # not the args
-        try:
-            result = run(args)
-            span.set_attribute(&quot;tool.result.bytes&quot;, len(result))
-            span.set_attribute(&quot;tool.result.truncated&quot;, getattr(result, &quot;truncated&quot;, False))
-            return result
-        except Exception as exc:
-            span.set_attribute(&quot;tool.error.type&quot;, type(exc).__name__)
-            raise</code></pre></figure>
-<h2 id="tracing-decisions-without-logging-conversations">Tracing decisions without logging conversations</h2>
-<p>This is the posture that gets observability past a security review, and it is worth designing for from the start rather than retrofitting after someone says no.</p>
-<p>Log the <strong>shape</strong> of what happened, not the contents:</p>
-<ul><li><code>tool.args.hash</code> rather than the arguments. Two identical hashes on consecutive turns is your oscillation detector, and it reveals nothing.</li><li>Token <em>counts</em> rather than text.</li><li>Tool names, durations, outcomes, sizes — none of which is customer data.</li><li>Result <em>size</em> and a truncation flag rather than the result.</li><li>Content classifications where you need them (<code>contains_pii: true</code>) rather than content.</li></ul>
-<p>You can debug an enormous amount from that. Oscillation, cost blowups, cache failures, drift in turn counts, tool error rates and truncation are all visible without a single sentence of conversation leaving the process.</p>
-<p>When you do need contents — and sometimes you do — make it explicit, short-retention, access- controlled, and off by default. A debug flag on a specific session, not a firehose.</p>
-<h2 id="the-failure-taxonomy">The failure taxonomy</h2>
-<p>Seven classes. Each has a trace signature; learn to read them.</p>
-<p><strong>Tool misselection.</strong> A plausible but wrong tool for the task. <em>Signature:</em> the tool ran fine, the result was irrelevant, and the next turn tries a different tool. <em>Root cause:</em> almost always tool descriptions (M2).</p>
-<p><strong>Argument malformation.</strong> Right tool, wrong arguments. <em>Signature:</em> validation errors, or empty results from a query that should have matched. <em>Root cause:</em> parameter descriptions, missing enums.</p>
-<p><strong>Context degradation.</strong> Quality falls as context fills. <em>Signature:</em> accuracy declining with turn index; early instructions stop being followed. <em>Root cause:</em> M3.</p>
-<p><strong>Goal drift.</strong> The agent ends up doing a different, adjacent task. <em>Signature:</em> tool arguments migrating steadily away from the original topic, and a final output on the wrong subject. No errors anywhere.</p>
-<p><strong>Oscillation.</strong> Repeated <code>(tool, args)</code> pairs with no state change between them. <em>Signature:</em> identical arg hashes on alternating turns. Cheapest failure to detect, if you hashed the args.</p>
-<p><strong>Silent truncation.</strong> A tool returned a fraction of the data with no marker. <em>Signature:</em> a result size suspiciously exactly at a limit, followed by confident conclusions. This is the nastiest one, because nothing anywhere looks like an error.</p>
-<p><strong>Injection.</strong> Retrieved content containing instructions the agent follows. <em>Signature:</em> a sudden change in behaviour immediately after a fetch or memory read, often with tool calls unrelated to the user's task. (M11.)</p>
-<div class="widget" data-widget="trace-reader" data-config='{}'><div class="widget-body"><em>This instrument needs JavaScript. The lesson reads fine without it.</em></div></div>
-<h2 id="replay-driven-debugging">Replay-driven debugging</h2>
-<p>The highest-leverage technique in the course, and it takes one paragraph to explain.</p>
-<p>When a run fails at turn 22, do not re-run the task from turn 0 and hope it fails the same way. Fork the session at turn 21, change exactly one thing, and run both branches.</p>
-<figure class="code" data-lang="text"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-text">session_abc123, failed at turn 22
-  ├── fork @21, baseline           -&gt; fails identically. The failure is deterministic given state.
-  ├── fork @21, tool desc rewritten -&gt; passes. Root cause found.
-  └── fork @21, compaction disabled -&gt; fails. Not the compaction.</code></pre></figure>
-<p>Three forks, one root cause, no statistics required. Compare that to re-running a stochastic task thirty times to see whether a change helped.</p>
-<p>This is why M5 spent time on sessions. It is also why your trace records need to be complete enough to reconstruct state: a trace you cannot replay from is a log.</p>
-<h2 id="alerting-on-agent-shaped-signals">Alerting on agent-shaped signals</h2>
-<p>HTTP 500s and latency percentiles will not tell you an agent is unwell. These will:</p>
-<p><strong>Cost per task, p50 and p95.</strong> The earliest signal of almost every problem. Retry storms, context bloat, cache breakage and oscillation all show up here first.</p>
-<p><strong>Tool error rate by tool.</strong> One tool degrading is invisible in an aggregate error rate and obvious per-tool.</p>
-<p><strong>Turn-count distribution shift.</strong> Not the mean — the <em>shape</em>. A growing tail means tasks are starting to thrash before they finish, and it precedes user complaints by days.</p>
-<p><strong>Cache hit rate.</strong> A cliff means someone put a timestamp in the system prompt. Silent, expensive, trivially detectable.</p>
-<p><strong>Refusal and abstention rate.</strong> A sudden rise means something upstream changed — a prompt edit, a tool returning garbage, a corpus that stopped loading.</p>
-<p><strong>Truncation rate.</strong> Count it explicitly. Silent truncation is invisible by construction unless your tools report it and you graph it.</p>
-<aside class="callout c-autopsy"><h4>The heisenbug that only failed in production</h4><div class="callout-body"><p>An agent that passed every eval and failed intermittently in production, roughly one run in twelve, never reproducibly. Local runs were clean.</p>
-<p>Trace comparison found it. Successful and failing traces were identical except for the <em>order</em> of items in one tool's result. Under load, the backing service returned rows in nondeterministic order, and the agent had learned — from the tool's description, which promised "most relevant first" — to rely on the first row.</p>
-<p>Nothing errored. No log line was wrong. It was found by diffing two traces of the same task, which is only possible if you record enough to diff. The fix was one sentence in the tool description and an explicit sort — but the fix was never the hard part. Seeing it was.</p></div></aside>
-<aside class="callout c-lab"><h4>Lab 10 — Observatory v3</h4><div class="callout-body"><p><code>labs/lab10_observability</code> — wire OpenTelemetry through your M9 multi-agent system and build a subagent waterfall with per-span cost attribution. You should be able to see, at a glance, which worker cost what and where the wall-clock went.</p>
-<p>Then the diagnosis exercise: three broken agents, one failure class each, <strong>source access denied</strong>. You get traces and nothing else. Root-cause all three in writing. This is the gate, and it is deliberately the same position you are in during a real incident.</p></div></aside>
-<h2 id="further-reading">Further reading</h2>
-<ul><li><a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/">OpenTelemetry semantic conventions for GenAI</a></li><li><a href="https://code.claude.com/docs/en/agent-sdk">Claude Agent SDK: monitoring</a></li></ul>
+    span.set_attribute(&quot;agent.stop_reason&quot;, response.stop_reason)
+    span.set_attribute(&quot;agent.tokens.input&quot;, response.usage.input_tokens)
+    span.set_attribute(&quot;agent.tools.requested&quot;,
+                       [b.name for b in response.content if b.type == &quot;tool_use&quot;])</code></pre></figure>
+<p>A <strong>span</strong> is one piece of work with a start, an end and some labels. Spans nest, which is what makes a worker breakdown (M9) readable.</p>
+<p>The gain is not the format itself — it is that existing dashboards, alerting and storage already understand it, so you are not also building a monitoring product.</p></div></details>
+<aside class="callout c-lab"><h4>Lab 10 — read the record, name the failure</h4><div class="callout-body"><p><code>labs/lab10_observability</code> gives you three broken agents, one failure kind each, <strong>with no access to their code.</strong> You get the records and nothing else.</p>
+<figure class="code" data-lang="bash"><button class="copy" type="button" aria-label="Copy code">copy</button><pre><code class="lang-bash">python3 -m lab10_observability.diagnose
+pytest labs/lab10_observability -q</code></pre></figure>
+<p>That is deliberately the position you are in during a real incident.</p>
+<p>One test is worth reading afterwards: it detects looping using only argument fingerprints, and asserts that the actual argument values appear nowhere. That is the privacy-preserving approach, proved rather than promised.</p></div></aside>
+<h2 id="what-you-now-know">What you now know</h2>
+<ul><li>Ordinary logging fails because the unit of interest is a <strong>decision</strong>, and failures build across turns.</li><li>Record turns, tools, tokens, cache figures, cost, workers, retries and <strong>which version was running</strong>.</li><li><strong>Fingerprints instead of arguments</strong> let you diagnose without recording conversations.</li><li>Seven failure kinds, each with a recognisable signature. Silent shortening is the nastiest.</li><li><strong>Branch a saved run</strong> and change one thing. Three branches beat thirty re-runs.</li><li>Watch cost per task, per-tool error rates, the turn-count tail, cache hits, abstentions and shortening.</li></ul>
+<p>Next: keeping an agent from being turned against you.</p>
 <h2 id="knowledge-check">Knowledge check</h2><div id="quiz"></div>
 <div class="callout c-gate"><h4>Ship gate</h4><div class="callout-body"><p>All three broken agents correctly root-caused in writing; waterfall renders with accurate cost attribution.</p>
 <p style="margin-top:9px"><code>pytest labs/lab10_observability -q</code></p></div></div>
@@ -129,7 +124,7 @@ def traced_tool(name, args, run):
   <a href="https://github.com/tomo6445/agentbuildercourse">repository</a><br>
   Progress is stored in this browser only. Press <b>Esc</b> to leave a widget.
 </footer>
-<script>window.QUIZ={"id": "m10", "questions": [{"q": "Why is request/response logging insufficient for agents?", "options": ["Agent responses are too large to log", "The unit of interest is a decision made from accumulated context, and failures emerge across turns rather than at one request", "Agents do not produce HTTP requests", "Logs cannot capture streaming responses"], "answer": 1, "why": "\"Why did it call that tool?\" is answered by what was in context at that moment, not by any single request line. And the turn that looks wrong is usually downstream of the turn that was wrong \u2014 a truncated result on turn 4 producing a false answer on turn 7."}, {"q": "You must trace agent behaviour without logging conversation contents. Which detector still works?", "options": ["Detecting hallucinated facts in the output", "Oscillation, via hashes of (tool, arguments) repeating across turns", "Verifying citations point to real documents", "Checking the tone of the final answer"], "answer": 1, "why": "An argument hash reveals nothing about contents but makes repeated identical calls obvious. Alongside token counts, tool names, durations, result sizes and truncation flags, you can diagnose oscillation, cost blowups, cache failures and degradation without a sentence of conversation leaving the process."}, {"q": "A trace shows a tool result of exactly 4,000 tokens, followed by a confident conclusion about a 48,000-token document. Which failure class is this?", "options": ["Tool misselection", "Goal drift", "Silent truncation", "Oscillation"], "answer": 2, "why": "A result sitting suspiciously exactly at a limit, followed by confident conclusions, is the signature of silent truncation. It is the nastiest class because nothing in the trace looks like an error \u2014 the tool succeeded, the model answered, and the answer is false."}, {"q": "An agent fails at turn 22 of a stochastic task. What is the most efficient debugging move?", "options": ["Re-run the task 30 times and compare success rates", "Fork the session at turn 21 and run branches that differ by exactly one variable", "Increase logging verbosity and wait for it to recur", "Reduce the turn cap to 21 to isolate the failure"], "answer": 1, "why": "Re-running compares stochastic outcomes and needs many samples to conclude anything. Forking at turn 21 holds the entire history fixed so each branch tests one hypothesis \u2014 usually three forks find the root cause. This requires traces complete enough to replay from; a trace you cannot replay is just a log."}, {"q": "Which alert would catch a prompt-caching regression fastest?", "options": ["HTTP 5xx rate", "Mean turn count", "Cache hit rate, plus cost per task", "Model refusal rate"], "answer": 2, "why": "A broken cache raises nothing and changes no output \u2014 it just multiplies the bill. A cache-hit-rate cliff (usually a timestamp appearing in the system prompt, or a tool list that stopped being deterministic) is immediately visible in that metric and in cost per task, and invisible everywhere else."}]};</script>
+<script>window.QUIZ={"id": "m10", "questions": [{"q": "Why is ordinary request logging insufficient for agents?", "options": ["Agent responses are too large to log", "The thing you care about is a decision made from accumulated context, and failures build across turns", "Agents do not produce requests", "Logs cannot capture streaming"], "answer": 1, "why": "\"Why did it call that tool?\" is answered by what was in the conversation at that moment, not by any single log line. And the turn that looks wrong is usually downstream of the one that was wrong \u2014 a shortened result on turn 4 producing a false answer on turn 7."}, {"q": "You must diagnose agent behaviour without recording any conversation contents. Which detector still works?", "options": ["Spotting invented facts in the output", "Looping, via fingerprints of the tool arguments repeating across turns", "Checking citations point to real documents", "Judging the tone of the final answer"], "answer": 1, "why": "A fingerprint reveals nothing about the data but makes repeated identical calls obvious. Together with token counts, tool names, durations and result sizes, you can diagnose looping, cost blowouts, broken caching and degradation without a sentence of conversation leaving the process."}, {"q": "A record shows a tool result of exactly 4,000 tokens, followed by a confident conclusion about a 48,000-token document. Which failure is this?", "options": ["Wrong tool chosen", "Drift", "Silent shortening", "Looping"], "answer": 2, "why": "A result sitting exactly on a round limit followed by confident conclusions is the signature. It is the nastiest kind because nothing looks like an error \u2014 the tool succeeded, the model answered, and the answer is false."}, {"q": "A run fails at turn 22 of a task that varies between runs. What is the most efficient way to debug it?", "options": ["Re-run it 30 times and compare success rates", "Branch the saved run at turn 21 and run versions that differ by exactly one thing", "Turn up the logging and wait for it to happen again", "Lower the turn limit to 21"], "answer": 1, "why": "Re-running compares outcomes that would have differed anyway, so you need many samples to conclude anything. Branching holds the entire history fixed, so each version tests one hypothesis \u2014 usually three branches find the cause. It requires records complete enough to restart from."}, {"q": "Which signal would catch broken prompt caching fastest?", "options": ["Server error rate", "Average turn count", "Cache hit rate, together with cost per task", "How often the model declines"], "answer": 2, "why": "Broken caching raises nothing and changes no output \u2014 it just multiplies the bill. A cache-hit cliff, usually caused by a timestamp appearing in the instructions or a tool list that stopped being stable, is immediately visible in that metric and invisible everywhere else."}]};</script>
 <script src="../assets/widgets.js"></script>
 <script src="../assets/widgets-b.js"></script>
 <script src="../assets/course.js"></script>
